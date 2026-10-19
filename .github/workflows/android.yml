@@ -1,0 +1,54 @@
+# main에 올릴 때마다 안드로이드 APK를 자동으로 만든다 (Actions 탭 → 실행 결과 → Artifacts에서 다운로드)
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: 엔진 테스트
+        run: node test/run.mjs
+
+      - name: 패키지 설치
+        run: npm install --no-audit --no-fund
+
+      - name: 앱 파일 준비 (MediaPipe·모델 포함)
+        run: node tools/prepare-www.mjs
+
+      - name: 안드로이드 프로젝트 생성
+        run: |
+          npx cap add android
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          # 카메라 권한 (WebView에서 getUserMedia 사용)
+          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />#' "$MANIFEST"
+          # 운동 중 화면 회전으로 앱이 다시 시작되지 않게 세로 고정
+          sed -i 's#android:name=".MainActivity"#android:name=".MainActivity"\n            android:screenOrientation="portrait"#' "$MANIFEST"
+          grep -n "CAMERA\|portrait" "$MANIFEST"
+          npx cap sync android
+
+      - name: APK 빌드
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: posture-coach-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30

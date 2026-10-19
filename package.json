@@ -1,0 +1,20 @@
+{
+  "name": "posture-coach",
+  "version": "0.1.0",
+  "private": true,
+  "description": "운동 자세 코치 — 안드로이드 앱 빌드용 (웹 버전은 빌드 없이 index.html 그대로 사용)",
+  "scripts": {
+    "test": "node test/run.mjs",
+    "prepare-www": "node tools/prepare-www.mjs",
+    "android": "npm run prepare-www && npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor-community/text-to-speech": "^4.0.0",
+    "@capacitor/android": "^6.1.0",
+    "@capacitor/core": "^6.1.0",
+    "@mediapipe/tasks-vision": "0.10.14"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.0"
+  }
+}

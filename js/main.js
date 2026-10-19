@@ -246,8 +246,21 @@ function showSummary() {
 
 // ---------- 음성 ----------
 const spoken = new Map();
+// 안드로이드 앱(WebView)에는 브라우저 음성 기능이 없어서 네이티브 음성 플러그인을 씀
+let nativeTTS = null;
+if (window.Capacitor?.isNativePlatform?.() || window.androidBridge) {
+  import("./vendor/capacitor-core.js")
+    .then(({ registerPlugin }) => { nativeTTS = registerPlugin("TextToSpeech"); })
+    .catch((e) => console.warn("음성 플러그인 없음", e));
+}
 function speak(text, key) {
-  if (!el.voice.checked || !("speechSynthesis" in window)) return;
+  if (!el.voice.checked) return;
+  if (nativeTTS) {
+    if (!text.trim()) return;
+    nativeTTS.speak({ text, lang: "ko-KR", rate: 1.1, category: "playback", queueStrategy: key === "count" ? 0 : 1 }).catch(() => {});
+    return;
+  }
+  if (!("speechSynthesis" in window)) return;
   const u = new SpeechSynthesisUtterance(text);
   u.lang = "ko-KR";
   u.rate = 1.1;

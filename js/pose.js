@@ -8,6 +8,22 @@ const MODELS = {
   full: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
 };
 
+// 앱(APK) 빌드 때는 js/vendor/mediapipe/ 에 파일과 모델이 같이 들어감 → 인터넷 없이 동작
+// 웹 배포에는 없으므로 CDN에서 받아옴
+const LOCAL = new URL("./vendor/mediapipe/", import.meta.url).href;
+let mpCache = null;
+async function loadMediaPipe() {
+  if (mpCache) return mpCache;
+  try {
+    const mod = await import(`${LOCAL}vision_bundle.mjs`);
+    mpCache = { mod, wasm: `${LOCAL}wasm`, model: (m) => `${LOCAL}pose_landmarker_${m}.task` };
+  } catch {
+    const mod = await import(`${MP_BASE}/vision_bundle.mjs`);
+    mpCache = { mod, wasm: `${MP_BASE}/wasm`, model: (m) => MODELS[m] };
+  }
+  return mpCache;
+}
+
 export class PoseDetector {
   constructor() {
     this.landmarker = null;
@@ -17,10 +33,11 @@ export class PoseDetector {
 
   async init(model = "lite", force = null) {
     if (this.landmarker && this.model === model && !force) return;
-    const { PoseLandmarker, FilesetResolver } = await import(`${MP_BASE}/vision_bundle.mjs`);
-    const fileset = await FilesetResolver.forVisionTasks(`${MP_BASE}/wasm`);
+    const mp = await loadMediaPipe();
+    const { PoseLandmarker, FilesetResolver } = mp.mod;
+    const fileset = await FilesetResolver.forVisionTasks(mp.wasm);
     const make = (delegate) => PoseLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: MODELS[model], delegate },
+      baseOptions: { modelAssetPath: mp.model(model), delegate },
       runningMode: "VIDEO",
       numPoses: 1,
       minPoseDetectionConfidence: 0.5,
