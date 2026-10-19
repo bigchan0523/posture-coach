@@ -9,6 +9,8 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -52,3 +54,12 @@ jobs:
           name: posture-coach-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+
+      # 폰에서 바로 받을 수 있게 Releases의 'latest'에 APK를 올린다 (매 빌드마다 교체)
+      - name: 릴리스에 APK 올리기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk posture-coach.apk
+          gh release delete latest -y --cleanup-tag || true
+          gh release create latest posture-coach.apk --title "최신 APK" --notes "커밋 ${GITHUB_SHA::7} 빌드. 폰에서 posture-coach.apk를 받아 설치하세요." --latest
