@@ -1,8 +1,6 @@
 # 운동 자세 코치 (프로토타입)
 
 폰 카메라로 운동하는 모습을 비추거나 촬영한 영상을 넣으면, 관절 각도를 보고 횟수를 세고 잘못된 자세를 알려주는 웹앱.
-[yakupzengin/fitness-trainer-pose-estimation](https://github.com/yakupzengin/fitness-trainer-pose-estimation) (MIT)의
-운동 정의 18개와 판정 엔진을 폰에서 돌도록 JavaScript로 옮기고 버그를 고친 버전이다.
 
 - 포즈 인식은 폰 브라우저 안에서 MediaPipe로 실행 → 서버 없음, 영상이 밖으로 나가지 않음
 - 실시간 카메라 / 촬영·저장한 영상 분석 둘 다 지원
