@@ -124,7 +124,6 @@ function startLoop(mode) {
   el.btnStop.hidden = false;
   el.btnCamera.disabled = true;
   $("stage").scrollIntoView({ behavior: "smooth", block: "start" });
-  if (el.voice.checked) speak(" "); // iOS: 사용자 터치 안에서 음성 엔진 깨우기
   cancelAnimationFrame(rafId);
   rafId = requestAnimationFrame(loop);
 }
@@ -269,7 +268,15 @@ function safeSet(k, v) { try { localStorage.setItem(k, v); } catch { /* 저장 �
 
 // ---------- 이벤트 ----------
 el.exercise.addEventListener("change", () => selectExercise(el.exercise.value));
-el.btnCamera.addEventListener("click", startCamera);
+// iOS Safari: 음성은 '터치 직후 바로' 한 번 말해야 이후에도 나옴 → 모델 로딩(await) 전에 깨워둔다
+function unlockSpeech() {
+  if (!el.voice.checked || !("speechSynthesis" in window)) return;
+  const u = new SpeechSynthesisUtterance(" ");
+  u.volume = 0;
+  speechSynthesis.speak(u);
+}
+el.btnCamera.addEventListener("click", () => { unlockSpeech(); startCamera(); });
+document.querySelector('label[for="fileInput"]').addEventListener("click", unlockSpeech);
 el.btnStop.addEventListener("click", stop);
 el.fileInput.addEventListener("change", () => { startFile(el.fileInput.files[0]); el.fileInput.value = ""; });
 el.model.addEventListener("change", () => { if (detector && !DEMO) detector.model = null; });

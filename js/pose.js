@@ -15,8 +15,8 @@ export class PoseDetector {
     this.model = null;
   }
 
-  async init(model = "lite") {
-    if (this.landmarker && this.model === model) return;
+  async init(model = "lite", force = null) {
+    if (this.landmarker && this.model === model && !force) return;
     const { PoseLandmarker, FilesetResolver } = await import(`${MP_BASE}/vision_bundle.mjs`);
     const fileset = await FilesetResolver.forVisionTasks(`${MP_BASE}/wasm`);
     const make = (delegate) => PoseLandmarker.createFromOptions(fileset, {
@@ -28,10 +28,13 @@ export class PoseDetector {
       minTrackingConfidence: 0.5,
     });
     this.landmarker?.close?.();
+    this.delegate = force || "GPU";
     try {
-      this.landmarker = await make("GPU");
+      this.landmarker = await make(this.delegate);
     } catch (e) {
+      if (this.delegate === "CPU") throw e;
       console.warn("GPU 사용 불가, CPU로 실행", e);
+      this.delegate = "CPU";
       this.landmarker = await make("CPU");
     }
     this.model = model;
@@ -42,8 +45,20 @@ export class PoseDetector {
     // MediaPipe는 타임스탬프가 계속 증가해야 함 — 영상 되감기 등에 대비해 내부 시계를 따로 둠
     const ts = Math.max(this.lastTs + 1, Math.round(performance.now()));
     this.lastTs = ts;
-    const res = this.landmarker.detectForVideo(video, ts);
-    return res?.landmarks?.[0] ?? null;
+    if (this.switching) return null;
+    try {
+      const res = this.landmarker.detectForVideo(video, ts);
+      return res?.landmarks?.[0] ?? null;
+    } catch (e) {
+      // 일부 기기(특히 iOS)에서 GPU가 실행 중에 실패하는 경우 → CPU로 다시 만든다
+      if (this.delegate === "GPU") {
+        console.warn("GPU 인식 실패, CPU로 전환", e);
+        this.switching = true;
+        this.init(this.model, "CPU").finally(() => { this.switching = false; });
+        return null;
+      }
+      throw e;
+    }
   }
 }
 
