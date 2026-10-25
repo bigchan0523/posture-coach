@@ -532,6 +532,16 @@ $video.addEventListener("change", () => {
 });
 
 // ---------- 시작 ----------
+// 시작 화면: 앱을 켠 뒤 3초 동안 보여주고 사라짐 (?nosplash 로 끌 수 있음)
+const $splash = document.getElementById("splash");
+function hideSplash() {
+  if (!$splash) return;
+  $splash.classList.add("hide");
+  setTimeout(() => $splash.remove(), 400);
+}
+if (new URLSearchParams(location.search).has("nosplash")) $splash?.remove();
+else setTimeout(hideSplash, Math.max(0, 3000 - performance.now()));
+
 loadDefs().then(render).catch((e) => {
   console.error(e);
   $view.innerHTML = `<p class="error pad">운동 정보를 불러오지 못했어요: ${esc(e.message)}</p>`;

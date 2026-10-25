@@ -71,6 +71,8 @@ jobs:
           </vector>
           XML
           sed -i 's#<color name="ic_launcher_background">[^<]*</color>#<color name="ic_launcher_background">\#FFFFFF</color>#' "$RES/values/ic_launcher_background.xml" 2>/dev/null || true
+          # 격자 없는 새 아이콘 그림 (resources/android → res)
+          cp -r resources/android/. "$RES"/
           cat "$RES"/mipmap-anydpi-v26/ic_launcher.xml
           npx cap sync android
 

@@ -7,7 +7,7 @@ const root = new URL("..", import.meta.url).pathname;
 const www = join(root, "www");
 rmSync(www, { recursive: true, force: true });
 mkdirSync(www, { recursive: true });
-for (const f of ["index.html", "css", "js", "exercises", "test"]) cpSync(join(root, f), join(www, f), { recursive: true });
+for (const f of ["index.html", "css", "js", "exercises", "test", "img", "fonts"]) cpSync(join(root, f), join(www, f), { recursive: true });
 
 const mp = join(www, "js/vendor/mediapipe");
 mkdirSync(mp, { recursive: true });

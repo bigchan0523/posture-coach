@@ -4,10 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
+  <link rel="preload" href="fonts/PretendardVariable.woff2" as="font" type="font/woff2" crossorigin>
   <title>자세 코치</title>
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
+  <!-- 앱을 켤 때 3초 정도 보이는 시작 화면 -->
+  <div id="splash" class="splash" role="img" aria-label="자세 코치, 오늘의 운동">
+    <img src="img/logo.svg" alt="">
+    <p>오늘의 운동</p>
+  </div>
   <div id="app">
     <main id="view" tabindex="-1"></main>
     <nav class="tabbar" aria-label="메뉴">
