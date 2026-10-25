@@ -72,7 +72,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .group { font-size: 14px; color: var(--muted); font-weight: 700; margin: 18px 2px 2px; }
 .tag { font-size: 12px; color: var(--sky-deep); background: var(--sky-soft); border-radius: 6px; padding: 1px 6px; margin-left: 4px; vertical-align: 2px; }
 
-.mark { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex: none; }
+.mark { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; flex: none; }
 .mark { font-weight: 800; font-size: 15px; }
 .mark svg { width: 22px; height: 22px; }
 .a-lower { background: #ddf0fc; color: #1572b8; }
@@ -81,7 +81,7 @@ svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width:
 .a-cardio { background: #fff0db; color: #b06a00; }
 .mark.plain { background: var(--surface); color: var(--sky-deep); }
 .r-stack { display: flex; }
-.r-stack .mark { width: 30px; height: 30px; border-radius: 9px; border: 2px solid #fff; margin-right: -10px; }
+.r-stack .mark { width: 34px; height: 34px; border-radius: 10px; border: 2px solid #fff; margin-right: -10px; }
 .r-stack .mark { font-size: 12px; }
 .r-stack + .row-main { margin-left: 10px; }
 
@@ -136,7 +136,7 @@ select, input[type=number], .field input { min-height: 48px; border: 1.5px solid
 
 /* ---------- 운동 상세 ---------- */
 .ex-head { display: flex; gap: 14px; align-items: flex-start; margin: 4px 0 12px; }
-.ex-head .mark { width: 56px; height: 56px; border-radius: 16px; }
+.ex-head .mark { width: 72px; height: 72px; border-radius: 20px; }
 .ex-head .mark { font-size: 22px; }
 .ex-view { font-weight: 800; color: var(--sky-deep); }
 .edit-row { display: grid; grid-template-columns: 1fr 86px 80px 40px; gap: 6px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
@@ -310,3 +310,6 @@ body.in-session .tabbar { display: none; }
 .ring-legend span { display: block; font-size: 13px; color: var(--muted); }
 .ring-legend b { font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; margin-right: 4px; }
 .ring-legend small { color: var(--muted); font-size: 13px; }
+
+/* 동작 픽토그램 */
+.mark .picto { width: 94%; height: 94%; stroke: currentColor; stroke-width: 4.4; }

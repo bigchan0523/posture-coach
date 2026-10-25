@@ -5,6 +5,7 @@ import { store, sessionsByDay, streak, sessionStats, totals, exerciseHistory, ex
 import { AREAS, areaOf, PRESETS, LEVELS, VIEW_TEXT, scaled, estimateMinutes, totalSets } from "./routines.js";
 import { weekdayBars, trendLine, monthCalendar, rings, dayFractions, RING_COLORS } from "./charts.js";
 import { sfx } from "./sound.js";
+import { PICTOS } from "./pictos.js";
 
 const defs = {};
 let names = [];
@@ -34,9 +35,8 @@ const ICON = {
   trash: '<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></svg>',
 };
 
-// 운동 부위 표시: 부위 첫 글자 + 부위 색
-const AREA_CHAR = { lower: "하", upper: "상", core: "코", cardio: "유" };
-const mark = (ex) => `<span class="mark a-${areaOf(ex)}" aria-hidden="true">${AREA_CHAR[areaOf(ex)]}</span>`;
+// 운동 표시: 동작 픽토그램 + 부위 색 (tools/make-pictos.mjs 로 생성)
+const mark = (ex) => `<span class="mark a-${areaOf(ex)}" aria-hidden="true">${PICTOS[ex] || ""}</span>`;
 
 // ---------- 데이터 ----------
 async function loadDefs() {
