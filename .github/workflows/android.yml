@@ -41,6 +41,25 @@ jobs:
           # 운동 중 화면 회전으로 앱이 다시 시작되지 않게 세로 고정
           sed -i 's#android:name=".MainActivity"#android:name=".MainActivity"\n            android:screenOrientation="portrait"#' "$MANIFEST"
           grep -n "CAMERA\|portrait" "$MANIFEST"
+          # 앱이 켜져 있는 동안 화면이 꺼지지 않게 (운동 중 화면 꺼짐 방지)
+          MAIN=$(find android/app/src/main/java -name MainActivity.java)
+          PKG=$(head -1 "$MAIN")
+          cat > "$MAIN" <<JAVA
+          $PKG
+
+          import android.os.Bundle;
+          import android.view.WindowManager;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+              }
+          }
+          JAVA
+          cat "$MAIN"
           npx cap sync android
 
       - name: APK 빌드

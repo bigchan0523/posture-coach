@@ -3,71 +3,49 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0f172a">
-  <title>운동 자세 코치</title>
+  <meta name="theme-color" content="#ffffff">
+  <title>자세 코치</title>
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-  <header class="top">
-    <h1>운동 자세 코치 <small>프로토타입</small></h1>
-  </header>
+  <div id="app">
+    <main id="view" tabindex="-1"></main>
+    <nav class="tabbar" aria-label="메뉴">
+      <button data-tab="home"><svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></svg><span>홈</span></button>
+      <button data-tab="workouts"><svg viewBox="0 0 24 24"><path d="M3 10h2v4H3zM19 10h2v4h-2zM6 7h3v10H6zM15 7h3v10h-3zM9 11h6v2H9z"/></svg><span>운동</span></button>
+      <button data-tab="records"><svg viewBox="0 0 24 24"><path d="M4 20V10h3v10zM10.5 20V4h3v16zM17 20v-7h3v7z"/></svg><span>기록</span></button>
+    </nav>
+  </div>
 
-  <main>
-    <section class="panel" id="setup">
-      <label class="field">
-        <span>운동</span>
-        <select id="exercise"></select>
-      </label>
-      <p id="exInfo" class="hint"></p>
-
-      <div class="actions">
-        <button id="btnCamera" class="primary">카메라로 시작</button>
-        <label class="button" for="fileInput">영상 촬영·불러오기</label>
-        <input id="fileInput" type="file" accept="video/*" hidden>
-        <button id="btnStop" hidden>멈추기</button>
+  <!-- 운동 진행 화면 -->
+  <section id="session" class="session" hidden aria-label="운동 진행">
+    <video id="sVideo" playsinline muted></video>
+    <canvas id="sCanvas"></canvas>
+    <header class="s-top">
+      <div class="s-head"><h2 id="sTitle"></h2><p id="sSub"></p></div>
+      <button id="sClose" class="s-icon" data-act="close" aria-label="운동 끝내기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    </header>
+    <div class="s-hud">
+      <div class="s-ring" id="sRing">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="52"/><circle id="sRingBar" class="bar" cx="60" cy="60" r="52"/></svg>
+        <div class="s-num"><span id="sCount">0</span><small id="sTarget"></small></div>
       </div>
+      <span id="sGrade" class="s-grade" hidden></span>
+    </div>
+    <div id="sNotice" class="s-notice" hidden></div>
+    <ul id="sMessages" class="s-messages" aria-live="polite"></ul>
+    <div id="sPanel" class="s-panel" hidden></div>
+    <div id="sControls" class="s-controls">
+      <button id="sPause" class="btn ghost" data-act="pause">일시정지</button>
+      <button id="sSkip" class="btn ghost" data-act="skip">건너뛰기</button>
+    </div>
+    <pre id="sDebug" class="s-debug" hidden></pre>
+  </section>
 
-      <details class="settings">
-        <summary>설정</summary>
-        <label class="field inline"><span>카메라</span>
-          <select id="facing">
-            <option value="user">전면 (폰 세워두고 화면 보면서)</option>
-            <option value="environment">후면 (다른 사람이 찍어줄 때)</option>
-          </select>
-        </label>
-        <label class="field inline"><span>인식 모델</span>
-          <select id="model">
-            <option value="lite">빠름 (lite)</option>
-            <option value="full">정확 (full)</option>
-          </select>
-        </label>
-        <label class="check"><input type="checkbox" id="voice" checked> 음성 안내</label>
-        <label class="check"><input type="checkbox" id="debug"> 각도·인식 정보 보기</label>
-      </details>
-      <p id="status" class="status" role="status"></p>
-    </section>
+  <!-- 설정 등 아래에서 올라오는 창 -->
+  <div id="sheet" class="sheet-wrap" hidden><div class="sheet" role="dialog" aria-modal="true"></div></div>
+  <input id="videoInput" type="file" accept="video/*" hidden>
 
-    <section class="stage" id="stage">
-      <video id="video" playsinline muted></video>
-      <canvas id="overlay"></canvas>
-      <div class="hud">
-        <div class="hud-top">
-          <div class="count"><span id="count">0</span><small id="countSub"></small></div>
-          <div class="score" id="scoreBox" hidden><span id="grade">-</span><small id="score"></small></div>
-        </div>
-        <div id="notice" class="notice" hidden></div>
-        <ul id="messages" class="messages"></ul>
-      </div>
-      <pre id="debugBox" class="debug" hidden></pre>
-    </section>
-
-    <section class="panel" id="logPanel">
-      <h2>회차 기록</h2>
-      <div id="summary" class="summary"></div>
-      <ul id="repLog" class="replog"></ul>
-    </section>
-  </main>
-
-  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

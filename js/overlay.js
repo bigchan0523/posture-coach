@@ -12,7 +12,9 @@ export function fitRect(srcW, srcH, boxW, boxH) {
   return { x: (boxW - w) / 2, y: (boxH - h) / 2, w, h };
 }
 
-const bgrToCss = (c) => (Array.isArray(c) ? `rgb(${c[2]},${c[1]},${c[0]})` : "#4ade80");
+// 강조선은 앱 색(하늘색)으로 통일, 자세 경고 중이면 빨간색
+const HILITE = "#38b6ff";
+const ALERT = "#ff5a5f";
 
 export function drawPose(ctx, lms, { srcW, srcH, mirror, visualization, pointIndex, angles, alert }) {
   const { width: W, height: H } = ctx.canvas;
@@ -39,24 +41,28 @@ export function drawPose(ctx, lms, { srcW, srcH, mirror, visualization, pointInd
   for (const line of visualization?.lines || []) {
     const a = idx(line.points[0]), b = idx(line.points[1]);
     if (a == null || b == null) continue;
-    ctx.strokeStyle = alert ? "#f87171" : bgrToCss(line.color);
+    ctx.strokeStyle = alert ? ALERT : HILITE;
     ctx.beginPath(); ctx.moveTo(...P(a)); ctx.lineTo(...P(b)); ctx.stroke();
   }
   for (const c of visualization?.circles || []) {
     const i = idx(c.point);
     if (i == null) continue;
-    ctx.fillStyle = alert ? "#f87171" : bgrToCss(c.color);
+    ctx.fillStyle = alert ? ALERT : "#ffffff";
     ctx.beginPath(); ctx.arc(...P(i), 7 * dpr, 0, Math.PI * 2); ctx.fill();
   }
 
   // 각도 숫자
   ctx.font = `${14 * dpr}px system-ui, sans-serif`;
   ctx.textBaseline = "middle";
+  const placed = [];
   for (const d of visualization?.angle_display || []) {
     const i = idx(d.position);
     const v = angles?.[d.angle];
     if (i == null || v == null) continue;
     const [x, y] = P(i);
+    // 옆모습에서는 좌우 관절이 겹쳐 숫자가 포개지므로 가까운 곳엔 하나만
+    if (placed.some(([px, py]) => Math.hypot(px - x, py - y) < 40 * dpr)) continue;
+    placed.push([x, y]);
     const text = `${Math.round(v)}°`;
     const tw = ctx.measureText(text).width;
     ctx.fillStyle = "rgba(0,0,0,0.6)";

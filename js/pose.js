@@ -80,6 +80,7 @@ export class PoseDetector {
 }
 
 // 카메라 없이 화면을 확인하기 위한 가짜 사람 (?demo 주소로 열면 사용)
+// 2.6초마다 한 번씩 동작하고, 세 번에 한 번은 일부러 덜 움직인다
 export class DemoDetector {
   async init() {
     this.sim = await import("../test/sim.mjs");
@@ -90,16 +91,41 @@ export class DemoDetector {
     const { sidePose, frontPose, toLandmarks, cycle } = this.sim;
     const t = (performance.now() - this.t0) / 1000;
     const k = t < 1 ? 0 : cycle(((t - 1) % 2.6) / 2.6);
-    const deep = Math.floor((t - 1) / 2.6) % 3 !== 2; // 세 번에 한 번은 얕게
-    const d = deep ? 1 : 0.45;
-    const poses = {
-      squat: () => sidePose({ trunk: 40 * k * d, L: { hip: 95 * k * d, knee: 120 * k * d } }),
-      push_up: () => sidePose({ lying: 90, arm: { sh: 90, el: 115 * k * d } }),
-      bicep_curl: () => frontPose({ arm: { abd: 5, el: 150 * k * d, elDir: -1 } }),
-      jumping_jack: () => frontPose({ arm: { abd: 10 + 165 * k * d }, legL: { abd: 15 * k }, legR: { abd: 15 * k } }),
+    const nth = Math.floor((t - 1) / 2.6);
+    const d = nth % 3 === 2 ? 0.45 : 1;
+    const alt = nth % 2 === 0; // 좌우 번갈아
+    const kd = k * d;
+    const P = {
+      squat: () => sidePose({ trunk: 40 * kd, L: { hip: 95 * kd, knee: 120 * kd } }),
+      lunge: () => {
+        const f = { hip: 80 * kd, knee: 90 * kd }, b = { hip: -25 * kd, knee: 100 * kd };
+        return sidePose({ trunk: 5 * kd, L: alt ? f : b, R: alt ? b : f });
+      },
+      side_lunge: () => frontPose({ drop: 0.35 * kd, caveL: -0.35 * kd, legL: { abd: 30 }, legR: { abd: 30 } }),
+      deadlift: () => sidePose({ trunk: 75 * kd, L: { hip: 10 * kd, knee: 15 * kd } }),
+      glute_bridge: () => sidePose({ lying: -90, L: { hip: 70 * (1 - kd), knee: 110 } }),
+      calf_raise: () => sidePose({ heelRise: 0.07 * kd }),
+      wall_sit: () => sidePose({ L: { hip: 90 * Math.min(1, t / 2), knee: 90 * Math.min(1, t / 2) } }),
+      push_up: () => sidePose({ lying: 90, arm: { sh: 90, el: 115 * kd } }),
+      plank: () => sidePose({ lying: 90, arm: { sh: 90, el: 90 } }),
+      leg_raise: () => sidePose({ lying: -90, L: { hip: 85 * kd } }),
+      mountain_climber: () => {
+        const l = alt ? kd : 0, r = alt ? 0 : kd;
+        return sidePose({ lying: 90, L: { hip: 100 * l, knee: 100 * l }, R: { hip: 100 * r, knee: 100 * r }, arm: { sh: 90 } });
+      },
+      high_knees: () => {
+        const l = alt ? kd : 0, r = alt ? 0 : kd;
+        return sidePose({ L: { hip: 105 * l, knee: 90 * l }, R: { hip: 105 * r, knee: 90 * r } });
+      },
+      tricep_dip: () => sidePose({ arm: { sh: -20, el: 100 * kd } }),
+      bicep_curl: () => frontPose({ arm: { abd: 5, el: 150 * kd, elDir: -1 } }),
+      hammer_curl: () => frontPose({ arm: { abd: 5, el: 145 * kd, elDir: -1 } }),
+      shoulder_press: () => frontPose({ arm: { abd: 75 + 100 * kd } }),
+      lateral_raise: () => frontPose({ arm: { abd: 10 + 82 * kd } }),
+      jumping_jack: () => frontPose({ arm: { abd: 10 + 165 * kd }, legL: { abd: 15 * k }, legR: { abd: 15 * k } }),
     };
-    const pose = (poses[this.name] || poses.squat)();
-    const { lm } = toLandmarks(pose, { W: 720, H: 1280 });
-    return lm;
+    const pose = (P[this.name] || P.squat)();
+    const lying = ["push_up", "plank", "mountain_climber", "glute_bridge", "leg_raise"].includes(this.name);
+    return toLandmarks(pose, { W: 720, H: 1280, scale: lying ? 0.4 : 0.6 }).lm;
   }
 }
