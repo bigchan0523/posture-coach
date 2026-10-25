@@ -1,14 +1,16 @@
 // 앱 화면: 홈 / 운동 / 기록 + 설정
 import yaml from "./vendor/js-yaml.mjs";
 import { runSession } from "./session.js";
-import { store, sessionsByDay, streak, sessionStats, totals, exerciseHistory, exercisesWithHistory, dayKey } from "./store.js";
+import { store, sessionsByDay, streak, sessionStats, totals, exerciseHistory, exercisesWithHistory, dayKey, dayStats, monthStats } from "./store.js";
 import { AREAS, areaOf, PRESETS, LEVELS, VIEW_TEXT, scaled, estimateMinutes, totalSets } from "./routines.js";
-import { heatmap, weekdayBars, trendLine } from "./charts.js";
+import { weekdayBars, trendLine, monthCalendar, rings, dayFractions, RING_COLORS } from "./charts.js";
 import { sfx } from "./sound.js";
 
 const defs = {};
 let names = [];
-const ui = { tab: "home", wTab: "presets", rTab: "overview", stack: [], formEx: null, testEx: "squat", confirmReset: false };
+const now0 = new Date();
+const ui = { tab: "home", wTab: "presets", rTab: "overview", stack: [], formEx: null, testEx: "squat", confirmReset: false,
+  weekOffset: 0, weekAnim: "", calY: now0.getFullYear(), calM: now0.getMonth(), calSel: dayKey(now0) };
 const $view = document.getElementById("view");
 const $sheet = document.getElementById("sheet");
 const $video = document.getElementById("videoInput");
@@ -23,6 +25,8 @@ const ICON = {
   gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   back: '<svg viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></svg>',
   chev: '<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>',
+  down: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   flame: '<svg viewBox="0 0 24 24"><path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.4 1.3-3.8 2.3-4.8.3 1.6 1.2 2.6 2.2 2.8C11 8.5 11 5.5 12 3z"/></svg>',
   camera: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
   film: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M10 9.5v5l4-2.5z"/></svg>',
@@ -69,27 +73,32 @@ const segmented = (key, items, current) => `<div class="seg" role="tablist">${it
 function homeScreen() {
   const now = new Date();
   const days = sessionsByDay();
-  const monday = new Date(now); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+  const monday = new Date(now); monday.setDate(now.getDate() - ((now.getDay() + 6) % 7) + ui.weekOffset * 7);
   const week = Array.from({ length: 7 }, (_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d; });
   const st = streak();
   const r = todayRoutine();
   const lv = LEVELS.find((l) => l.id === r.level);
   const last = store.history[store.history.length - 1];
+  const anim = ui.weekAnim;
+  ui.weekAnim = "";
 
   return `
   <header class="home-head">
     <h1 class="brand">자세 코치</h1>
     <div class="bar-right">
-      <span class="streak${st ? " on" : ""}" title="연속 운동">${ICON.flame}${st}일</span>
+      <button class="streak${st ? " on" : ""}" data-act="open-calendar" aria-label="연속 ${st}일, 달력 보기">${ICON.flame}${st}일</button>
       <button class="icon-btn" data-act="settings" aria-label="설정">${ICON.gear}</button>
     </div>
   </header>
-  <p class="date">${now.getMonth() + 1}월 ${now.getDate()}일 ${WEEK[now.getDay()]}요일</p>
-  <div class="week">${week.map((d) => {
+  <div class="date-row">${ui.weekOffset === 0
+    ? `<p class="date">${now.getMonth() + 1}월 ${now.getDate()}일 ${WEEK[now.getDay()]}요일</p>`
+    : `<p class="date">${week[0].getMonth() + 1}월 ${week[0].getDate()}일 ~ ${week[6].getMonth() + 1}월 ${week[6].getDate()}일</p><button class="text-btn" data-act="week-today">이번 주</button>`}</div>
+  <div class="week-wrap" id="weekSwipe" aria-label="좌우로 밀어서 다른 주 보기"><div class="week ${anim}">${week.map((d) => {
     const done = days.has(dayKey(d));
     const today = dayKey(d) === dayKey(now);
-    return `<div class="day${today ? " today" : ""}${done ? " done" : ""}"><span>${WEEK[d.getDay()]}</span><b>${d.getDate()}</b><i></i></div>`;
-  }).join("")}</div>
+    const future = d > now;
+    return `<button class="day${today ? " today" : ""}${done ? " done" : ""}${future ? " future" : ""}" data-act="open-day" data-day="${dayKey(d)}" ${future ? "disabled" : ""}><span>${WEEK[d.getDay()]}</span><b>${d.getDate()}</b><i></i></button>`;
+  }).join("")}</div></div>
 
   <section class="hero">
     <p class="hero-k">오늘의 루틴</p>
@@ -106,7 +115,7 @@ function homeScreen() {
     <h3>자세 테스트</h3>
     <p class="muted">한 세트만 해보고 자세 점수를 받아요</p>
     <div class="row-inline">
-      <select data-act="test-ex" aria-label="테스트할 운동">${names.map((n) => `<option value="${n}"${n === ui.testEx ? " selected" : ""}>${esc(exName(n))}</option>`).join("")}</select>
+      <button class="picker" data-act="pick-ex" data-for="test" aria-label="테스트할 운동 고르기">${mark(ui.testEx)}<span>${esc(exName(ui.testEx))}</span>${ICON.down}</button>
       <button class="btn primary" data-act="start-test">테스트</button>
     </div>
   </section>
@@ -186,12 +195,11 @@ function exerciseScreen({ ex }) {
 
 function editorScreen(s) {
   const r = s.draft;
-  const opts = (sel) => names.map((n) => `<option value="${n}"${n === sel ? " selected" : ""}>${esc(exName(n))}</option>`).join("");
   return `${backBar(s.isNew ? "새 루틴" : "루틴 수정", s.isNew ? "" : `<button class="icon-btn danger" data-act="delete-routine" aria-label="루틴 삭제">${ICON.trash}</button>`)}
     <label class="field pad"><span>루틴 이름</span><input id="rName" value="${esc(r.name)}" placeholder="예: 아침 하체" maxlength="20"></label>
     <div class="list">${r.items.map((it, i) => `
       <div class="edit-row" data-i="${i}">
-        <select data-act="ed-ex" data-i="${i}" aria-label="운동">${opts(it.ex)}</select>
+        <button class="picker" data-act="pick-ex" data-for="editor" data-i="${i}" data-ex="${it.ex}" aria-label="운동 고르기">${mark(it.ex)}<span>${esc(exName(it.ex))}</span>${ICON.down}</button>
         <label class="num"><input type="number" inputmode="numeric" min="1" max="10" value="${it.sets}" data-act="ed-sets" data-i="${i}" aria-label="세트">세트</label>
         <label class="num"><input type="number" inputmode="numeric" min="1" max="300" value="${it.sec ?? it.reps}" data-act="ed-amt" data-i="${i}" aria-label="${isHold(it.ex) ? "초" : "횟수"}">${isHold(it.ex) ? "초" : "회"}</label>
         <button class="icon-btn" data-act="ed-del" data-i="${i}" aria-label="빼기">${ICON.trash}</button>
@@ -205,7 +213,7 @@ function editorScreen(s) {
 function recordsScreen() {
   const hist = store.history;
   let body = "";
-  if (!hist.length) {
+  if (!hist.length && ui.rTab !== "overview") {
     body = `<p class="empty">운동을 하면 여기에 기록이 쌓여요. 운동한 날, 자주 운동하는 요일, 자세 점수 변화를 볼 수 있어요.</p>`;
   } else if (ui.rTab === "overview") {
     const t = totals();
@@ -215,8 +223,8 @@ function recordsScreen() {
         <div><b>${t.avgScore ?? "-"}</b><span>평균 점수</span></div>
         <div><b>${streak()}일</b><span>연속</span></div>
       </div>
-      <section class="block chart"><h3>운동한 날</h3><p class="muted">최근 13주</p>${heatmap(sessionsByDay())}<p class="tip" aria-live="polite"></p></section>
-      <section class="block chart"><h3>자주 운동하는 요일</h3>${weekdayBars(hist)}<p class="tip" aria-live="polite"></p></section>`;
+      ${calendarBlock()}
+      ${hist.length ? `<section class="block chart"><h3>자주 운동하는 요일</h3>${weekdayBars(hist)}<p class="tip" aria-live="polite"></p></section>` : ""}`;
   } else if (ui.rTab === "form") {
     const exs = exercisesWithHistory();
     if (!exs.length) body = `<p class="empty">아직 점수가 매겨진 동작이 없어요.</p>`;
@@ -245,6 +253,50 @@ function recordsScreen() {
     <div class="list">${body}</div>`;
 }
 
+function calendarBlock() {
+  const goals = store.settings;
+  const ms = monthStats(ui.calY, ui.calM);
+  const now = new Date();
+  const isNow = ui.calY === now.getFullYear() && ui.calM === now.getMonth();
+  const sel = dayStats(ui.calSel);
+  const sd = new Date(ui.calSel + "T00:00:00");
+  const legend = [
+    ["운동 시간", sel.minutes, `/ ${goals.goalMin}분`],
+    ["반복 횟수", sel.reps, `/ ${goals.goalReps}회`],
+    ["자세 점수", sel.avgScore ?? "-", "/ 100점"],
+  ];
+  return `<section class="block cal">
+    <div class="cal-top">
+      <button class="icon-btn" data-act="cal-prev" aria-label="이전 달">${ICON.back}</button>
+      <h3>${ui.calY !== now.getFullYear() ? `${ui.calY}년 ` : ""}${ui.calM + 1}월</h3>
+      <button class="icon-btn" data-act="cal-next" aria-label="다음 달" ${isNow ? "disabled" : ""}>${ICON.chev}</button>
+    </div>
+    <p class="cal-sum">운동한 날 <b>${ms.days}일</b><span class="sep"></span><b>${ms.reps}</b>회<span class="sep"></span><b>${ms.minutes}</b>분</p>
+    ${monthCalendar(ui.calY, ui.calM, ui.calSel, dayStats, goals)}
+    <div class="cal-detail">
+      <h4>${sd.getMonth() + 1}월 ${sd.getDate()}일 ${WEEK[sd.getDay()]}요일</h4>
+      <div class="cal-detail-body">
+        ${rings(dayFractions(sel, goals), 112)}
+        <ul class="ring-legend">${legend.map(([label, v, goal], i) => `<li><i style="background:${RING_COLORS[i]}"></i><div><span>${label}</span><b>${v}</b><small>${goal}</small></div></li>`).join("")}</ul>
+      </div>
+      ${sel.list.length ? `<div class="list">${sel.list.map(recordRow).join("")}</div>` : `<p class="muted">이날은 운동 기록이 없어요</p>`}
+    </div>
+  </section>`;
+}
+
+/** 운동 고르기 창 (흰 바탕, 파란 글자, 스크롤) */
+function pickExercise(current, onPick) {
+  pickCb = onPick;
+  $sheet.querySelector(".sheet").innerHTML = `
+    <div class="sheet-head"><h2>운동 고르기</h2><button class="text-btn" data-act="close-sheet">닫기</button></div>
+    <div class="pick-list">${AREAS.map((a) => `<h3 class="group">${a.name}</h3>${a.exercises.map((ex) => `
+      <button class="pick${ex === current ? " on" : ""}" data-pick="${ex}">${mark(ex)}<span>${esc(exName(ex))}</span><small>${VIEW_TEXT[defs[ex].view]}</small>${ex === current ? ICON.check : ""}</button>`).join("")}`).join("")}</div>`;
+  $sheet.hidden = false;
+  $sheet.querySelector(".sheet").classList.add("tall");
+  $sheet.querySelector(".pick.on")?.scrollIntoView({ block: "center" });
+}
+let pickCb = null;
+
 function recordScreen({ id }) {
   const h = store.history.find((x) => x.id === id);
   if (!h) { ui.stack.pop(); return recordsScreen(); }
@@ -269,11 +321,14 @@ function openSettings() {
   const s = store.settings;
   const seg = (key, items) => `<div class="seg small">${items.map(([v, l]) => `<button aria-selected="${s[key] === v}" data-set="${key}" data-val="${v}">${l}</button>`).join("")}</div>`;
   const toggle = (key, label) => `<label class="switch"><span>${label}</span><input type="checkbox" data-set="${key}" ${s[key] ? "checked" : ""}></label>`;
+  $sheet.querySelector(".sheet").classList.remove("tall");
   $sheet.querySelector(".sheet").innerHTML = `
     <div class="sheet-head"><h2>설정</h2><button class="text-btn" data-act="close-sheet">닫기</button></div>
     <div class="field"><span>카메라</span>${seg("facing", [["user", "앞쪽 (화면 보며)"], ["environment", "뒤쪽 (남이 찍기)"]])}</div>
     <div class="field"><span>인식 정확도</span>${seg("model", [["lite", "빠르게"], ["full", "정확하게"]])}</div>
     <div class="field"><span>세트 사이 휴식</span>${seg("restSec", [[15, "15초"], [30, "30초"], [45, "45초"], [60, "60초"], [90, "90초"]])}</div>
+    <div class="field"><span>하루 목표 운동 시간 (달력 바깥 링)</span>${seg("goalMin", [[10, "10분"], [20, "20분"], [30, "30분"], [45, "45분"], [60, "60분"]])}</div>
+    <div class="field"><span>하루 목표 반복 횟수 (달력 가운데 링)</span>${seg("goalReps", [[50, "50회"], [100, "100회"], [150, "150회"], [200, "200회"]])}</div>
     ${toggle("voice", "음성 안내")}
     ${toggle("sounds", "효과음")}
     ${toggle("debug", "운동 중 각도 표시 (확인용)")}
@@ -357,6 +412,31 @@ $view.addEventListener("click", (e) => {
       if (!b.dataset.confirm) { b.dataset.confirm = "1"; b.classList.add("armed"); toast("한 번 더 누르면 삭제돼요"); return; }
       store.deleteSession(id); ui.stack.pop(); toast("기록을 삭제했어요"); return render();
     case "form-ex": ui.formEx = ex; return render();
+    case "open-calendar": return openCalendar(dayKey(new Date()));
+    case "open-day": return openCalendar(b.dataset.day);
+    case "week-today": ui.weekOffset = 0; ui.weekAnim = ""; return render();
+    case "cal-prev": case "cal-next": {
+      const d = new Date(ui.calY, ui.calM + (act === "cal-next" ? 1 : -1), 1);
+      ui.calY = d.getFullYear(); ui.calM = d.getMonth();
+      const last = new Date(ui.calY, ui.calM + 1, 0);
+      const today = new Date();
+      ui.calSel = dayKey(last > today ? today : last);
+      return render();
+    }
+    case "cal-day": ui.calSel = b.dataset.day; return render();
+    case "pick-ex": {
+      const target = b.dataset.for;
+      if (target === "test") return pickExercise(ui.testEx, (v) => { ui.testEx = v; render(); });
+      const i = +b.dataset.i;
+      syncEditor();
+      const items = ui.stack[ui.stack.length - 1].draft.items;
+      return pickExercise(items[i].ex, (v) => {
+        const it = items[i];
+        it.ex = v;
+        if (isHold(v)) { it.sec = it.sec ?? 30; delete it.reps; } else { it.reps = it.reps ?? 12; delete it.sec; }
+        render();
+      });
+    }
   }
 });
 
@@ -365,6 +445,31 @@ $view.addEventListener("click", (e) => {
   const t = e.target.closest("[data-tip]");
   if (t) showTip(t);
 });
+function openCalendar(key) {
+  const d = new Date(key + "T00:00:00");
+  ui.tab = "records"; ui.rTab = "overview"; ui.stack = [];
+  ui.calY = d.getFullYear(); ui.calM = d.getMonth(); ui.calSel = key;
+  render();
+}
+
+// 홈 요일 줄: 좌우로 밀어 지난주/다음 주
+let swipe = null;
+$view.addEventListener("pointerdown", (e) => {
+  if (e.target.closest("#weekSwipe")) swipe = { x: e.clientX, y: e.clientY };
+});
+$view.addEventListener("pointerup", (e) => {
+  if (!swipe) return;
+  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+  swipe = null;
+  if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+  ui.weekOffset += dx < 0 ? 1 : -1;
+  ui.weekAnim = dx < 0 ? "from-right" : "from-left";
+  suppressClick = true;
+  render();
+});
+let suppressClick = false;
+$view.addEventListener("click", (e) => { if (suppressClick) { suppressClick = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+
 function showTip(el) {
   const box = el.closest(".chart")?.querySelector(".tip");
   if (!box) return;
@@ -375,14 +480,7 @@ function showTip(el) {
 
 $view.addEventListener("change", (e) => {
   const t = e.target;
-  if (t.dataset.act === "test-ex") ui.testEx = t.value;
-  if (t.dataset.act === "ed-ex") {
-    syncEditor();
-    const it = ui.stack[ui.stack.length - 1].draft.items[+t.dataset.i];
-    it.ex = t.value;
-    if (isHold(it.ex)) { it.sec = it.sec ?? 30; delete it.reps; } else { it.reps = it.reps ?? 12; delete it.sec; }
-    render();
-  }
+
 });
 
 function syncEditor() {
@@ -394,7 +492,7 @@ function syncEditor() {
   document.querySelectorAll(".edit-row").forEach((row) => {
     const it = d.items[+row.dataset.i];
     if (!it) return;
-    it.ex = row.querySelector("select").value;
+    it.ex = row.querySelector(".picker").dataset.ex;
     const [sets, amt] = row.querySelectorAll("input");
     it.sets = Math.max(1, Math.min(10, parseInt(sets.value, 10) || 1));
     const a = Math.max(1, Math.min(300, parseInt(amt.value, 10) || 1));
@@ -404,6 +502,8 @@ function syncEditor() {
 
 $sheet.addEventListener("click", (e) => {
   if (e.target === $sheet) { $sheet.hidden = true; return render(); }
+  const pk = e.target.closest("[data-pick]");
+  if (pk) { $sheet.hidden = true; const cb = pickCb; pickCb = null; cb?.(pk.dataset.pick); return; }
   const b = e.target.closest("[data-act],[data-set]");
   if (!b) return;
   if (b.dataset.act === "close-sheet") { $sheet.hidden = true; return render(); }

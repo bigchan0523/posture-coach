@@ -60,6 +60,18 @@ jobs:
           }
           JAVA
           cat "$MAIN"
+          # 앱 아이콘 배경: 격자 무늬 → 완전 흰색 (파란 도형은 그대로)
+          RES=android/app/src/main/res
+          cat > "$RES/drawable/ic_launcher_background.xml" <<XML
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp" android:height="108dp"
+              android:viewportWidth="108" android:viewportHeight="108">
+              <path android:fillColor="#FFFFFF" android:pathData="M0,0h108v108h-108z" />
+          </vector>
+          XML
+          sed -i 's#<color name="ic_launcher_background">[^<]*</color>#<color name="ic_launcher_background">\#FFFFFF</color>#' "$RES/values/ic_launcher_background.xml" 2>/dev/null || true
+          cat "$RES"/mipmap-anydpi-v26/ic_launcher.xml
           npx cap sync android
 
       - name: APK 빌드

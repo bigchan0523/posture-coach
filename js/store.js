@@ -2,7 +2,7 @@
 
 const KEY = "posture-coach.v1";
 const DEFAULT = {
-  settings: { facing: "user", model: "lite", voice: true, sounds: true, restSec: 30, debug: false },
+  settings: { facing: "user", model: "lite", voice: true, sounds: true, restSec: 30, debug: false, goalMin: 20, goalReps: 100 },
   today: { routine: "fullbody", level: "easy" },
   custom: [],   // [{ id, name, items }]
   history: [],  // [{ id, ts, title, kind, durationSec, items:[{ ex, name, sets:[{ reps, target, sec, targetSec, scores, faults }] }] }]
@@ -114,4 +114,27 @@ export function exercisesWithHistory() {
   const set = new Set();
   for (const s of state.history) for (const it of s.items) if (it.sets.some((st) => (st.scores || []).length)) set.add(it.ex);
   return [...set];
+}
+
+/** 하루 요약: 운동 시간(분), 반복 수, 평균 자세 점수, 그날 기록들 */
+export function dayStats(key) {
+  const list = state.history.filter((h) => dayKey(h.ts) === key);
+  let sec = 0, reps = 0, scores = [];
+  for (const h of list) {
+    sec += h.durationSec || 0;
+    for (const it of h.items) for (const st of it.sets) { reps += st.reps || 0; scores.push(...(st.scores || [])); }
+  }
+  return {
+    list, sessions: list.length, minutes: Math.round(sec / 60), reps,
+    avgScore: scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
+  };
+}
+
+/** 한 달 요약 */
+export function monthStats(y, m) {
+  const list = state.history.filter((h) => { const d = new Date(h.ts); return d.getFullYear() === y && d.getMonth() === m; });
+  const days = new Set(list.map((h) => dayKey(h.ts)));
+  let sec = 0, reps = 0;
+  for (const h of list) { sec += h.durationSec || 0; reps += sessionStats(h).reps; }
+  return { days: days.size, minutes: Math.round(sec / 60), reps };
 }

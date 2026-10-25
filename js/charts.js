@@ -63,3 +63,55 @@ export function trendLine(points) {
     ${pts.length > 1 ? `<text x="${W - R}" y="${H - 4}" class="axis" text-anchor="end">${md(lastD)}</text>` : ""}
   </svg>`;
 }
+
+// ---------- 삼성헬스 느낌 링 달력 ----------
+// 링 세 겹: 바깥 운동 시간, 가운데 반복 횟수, 안쪽 자세 점수 (색은 dataviz 검사 통과)
+export const RING_COLORS = ["#1e9be8", "#5b5ce6", "#14b8a6"];
+
+/** fr: [시간, 반복, 점수] 각각 0~1 */
+export function rings(fr, size = 40, { empty = false } = {}) {
+  const sw = size >= 80 ? size * 0.09 : size * 0.11;
+  const gap = sw * 0.35;
+  const c = size / 2;
+  let out = `<svg class="rings" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" aria-hidden="true">`;
+  fr.forEach((f, i) => {
+    const r = c - sw / 2 - i * (sw + gap);
+    const len = 2 * Math.PI * r;
+    const k = Math.max(0, Math.min(1, f || 0));
+    out += `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${RING_COLORS[i]}" stroke-opacity="${empty ? 0.12 : 0.18}" stroke-width="${sw}"/>`;
+    if (k > 0) out += `<circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${RING_COLORS[i]}" stroke-width="${sw}" stroke-linecap="round"
+      stroke-dasharray="${(len * k).toFixed(2)} ${len.toFixed(2)}" transform="rotate(-90 ${c} ${c})"/>`;
+  });
+  return out + "</svg>";
+}
+
+export const dayFractions = (st, goals) => [
+  st.minutes / goals.goalMin,
+  st.reps / goals.goalReps,
+  st.avgScore == null ? 0 : st.avgScore / 100,
+];
+
+/**
+ * 월 달력 (일요일 시작)
+ * @param stats (key) => dayStats
+ */
+export function monthCalendar(y, m, selKey, stats, goals) {
+  const first = new Date(y, m, 1);
+  const start = new Date(first); start.setDate(1 - first.getDay());
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const weeks = Math.ceil((first.getDay() + new Date(y, m + 1, 0).getDate()) / 7);
+  let cells = "";
+  for (let i = 0; i < weeks * 7; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const key = dayKey(d);
+    const out = d.getMonth() !== m;
+    const future = d > today;
+    const st = future ? null : stats(key);
+    const ring = future ? `<span class="ring-ph"></span>` : rings(dayFractions(st, goals), 38, { empty: !st.sessions });
+    cells += `<button class="cal-day${out ? " out" : ""}${future ? " future" : ""}${key === selKey ? " sel" : ""}${+d === +today ? " today" : ""}${d.getDay() === 0 ? " sun" : ""}"
+      data-act="cal-day" data-day="${key}" ${future ? "disabled" : ""} aria-label="${d.getMonth() + 1}월 ${d.getDate()}일${st?.sessions ? `, 운동 ${st.sessions}번` : ""}">
+      ${ring}<span class="cal-num">${d.getDate()}</span></button>`;
+  }
+  const head = ["일", "월", "화", "수", "목", "금", "토"].map((w, i) => `<span class="${i === 0 ? "sun" : ""}">${w}</span>`).join("");
+  return `<div class="cal-head">${head}</div><div class="cal-grid">${cells}</div>`;
+}
