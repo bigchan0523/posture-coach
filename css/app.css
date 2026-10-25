@@ -313,3 +313,14 @@ body.in-session .tabbar { display: none; }
 
 /* 동작 픽토그램 */
 .mark .picto { width: 94%; height: 94%; stroke: currentColor; stroke-width: 4.4; }
+
+/* 난이도 색: 초급 초록, 중급 파랑, 고급 보라 */
+.hero .lv.lv-easy { background: #16a364; }
+.hero .lv.lv-mid { background: #1257a8; }
+.hero .lv.lv-hard { background: #7b4de0; }
+.levels .seg button[data-val="easy"][aria-selected="true"] { color: #12804f; background: #e3f6ec; }
+.levels .seg button[data-val="mid"][aria-selected="true"] { color: #1257a8; background: #e1eefc; }
+.levels .seg button[data-val="hard"][aria-selected="true"] { color: #6a3fd1; background: #efe8fd; }
+.levels .seg button[data-val="easy"] { color: #4c9a76; }
+.levels .seg button[data-val="mid"] { color: #4f7fb8; }
+.levels .seg button[data-val="hard"] { color: #8f74d6; }

@@ -102,7 +102,7 @@ function homeScreen() {
 
   <section class="hero">
     <p class="hero-k">오늘의 루틴</p>
-    <h2>${esc(r.name)}${lv && !routineById(store.today.routine)?.custom ? ` <span class="lv">${lv.name}</span>` : ""}</h2>
+    <h2>${esc(r.name)}${lv ? ` <span class="lv lv-${lv.id}">${lv.name}</span>` : ""}</h2>
     <p class="hero-meta">${r.items.length}가지 운동, ${totalSets(r)}세트, 약 ${estimateMinutes(r, store.settings.restSec)}분</p>
     <ol class="hero-list">${r.items.map((it) => `<li>${esc(exName(it.ex))} <span>${it.sets}×${amount(it)}</span></li>`).join("")}</ol>
     <div class="hero-actions">
@@ -157,8 +157,9 @@ function workoutsScreen() {
     <div class="list">${body}</div>`;
 }
 
-function routineRow(r) {
-  const isToday = store.today.routine === r.id;
+function routineRow(base) {
+  const isToday = store.today.routine === base.id;
+  const r = scaled(base, isToday ? store.today.level : "easy");
   return `<button class="row routine" data-act="open-routine" data-id="${r.id}">
     <span class="r-stack">${r.items.slice(0, 3).map((it) => mark(it.ex)).join("")}</span>
     <div class="row-main"><b>${esc(r.name)}${isToday ? ' <span class="tag">오늘</span>' : ""}</b>
@@ -171,7 +172,7 @@ function routineScreen({ id, level }) {
   const r = scaled(base, base.custom ? "easy" : level);
   const right = base.custom ? `<button class="text-btn" data-act="edit-routine" data-id="${id}">수정</button>` : "";
   return `${backBar(base.name, right)}
-    ${base.custom ? "" : segmented("level", LEVELS.map((l) => [l.id, l.name]), r.level)}
+    ${base.custom ? "" : `<div class="levels">${segmented("level", LEVELS.map((l) => [l.id, l.name]), r.level)}</div>`}
     <p class="muted pad">${r.items.length}가지 운동, ${totalSets(r)}세트, 약 ${estimateMinutes(r, store.settings.restSec)}분</p>
     <div class="list">${r.items.map((it) => `
       <div class="row static">${mark(it.ex)}<div class="row-main"><b>${esc(exName(it.ex))}</b><span class="muted">${it.sets}세트 × ${amount(it)}, ${VIEW_TEXT[defs[it.ex].view]}</span></div></div>`).join("")}</div>
