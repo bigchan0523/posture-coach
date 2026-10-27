@@ -338,3 +338,19 @@ body.in-session .tabbar { display: none; }
 .splash p { font-size: 30px; font-weight: 800; letter-spacing: -0.02em;
   background-image: linear-gradient(90deg, #74ccff, #3ea4ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .splash.hide { opacity: 0; pointer-events: none; }
+
+/* ---------- 운동 화면 로딩 ---------- */
+.s-loading { position: absolute; inset: 0; z-index: 30; background: #fff; color: var(--ink); display: flex; align-items: center; justify-content: center; transition: opacity .3s ease; }
+.s-loading.hide { opacity: 0; pointer-events: none; }
+.s-loading .s-icon { position: absolute; top: calc(var(--safe-t) + 12px); right: 12px; background: var(--surface); color: var(--ink); }
+.l-mid { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0 32px; }
+.l-logo { position: relative; width: 132px; height: 132px; display: grid; place-items: center; margin-bottom: 26px; }
+.l-logo img { width: 76px; height: 76px; }
+.l-spin { position: absolute; inset: 0; border-radius: 50%; border: 5px solid #e3f2fd; border-top-color: var(--sky); animation: lspin .9s linear infinite; }
+@keyframes lspin { to { transform: rotate(360deg); } }
+.l-ex { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 6px;
+  background-image: linear-gradient(90deg, #74ccff, #3ea4ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.l-step { font-size: 17px; font-weight: 700; margin: 0 0 6px; }
+.l-hint { word-break: keep-all; text-wrap: balance; font-size: 14px; color: var(--muted, #6b7f93); margin: 0; line-height: 1.5; }
+.l-hint:empty { display: none; }
+@media (prefers-reduced-motion: reduce) { .l-spin { animation-duration: 2.4s; } }

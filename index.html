@@ -25,7 +25,8 @@
 
   <!-- 운동 진행 화면 -->
   <section id="session" class="session" hidden aria-label="운동 진행">
-    <video id="sVideo" playsinline muted></video>
+    <!-- poster: 안드로이드 WebView가 영상 나오기 전에 띄우는 회색 재생 아이콘 숨기기 (투명 1px) -->
+    <video id="sVideo" playsinline muted poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
     <canvas id="sCanvas"></canvas>
     <header class="s-top">
       <div class="s-head"><h2 id="sTitle"></h2><p id="sSub"></p></div>
@@ -46,6 +47,16 @@
       <button id="sSkip" class="btn ghost" data-act="skip">건너뛰기</button>
     </div>
     <pre id="sDebug" class="s-debug" hidden></pre>
+    <!-- 카메라·인식 모델 준비 중 로딩 화면 -->
+    <div id="sLoading" class="s-loading" hidden>
+      <button class="s-icon" data-act="quit" aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <div class="l-mid">
+        <div class="l-logo"><span class="l-spin"></span><img src="img/logo.svg" alt=""></div>
+        <p class="l-ex" id="lEx"></p>
+        <p class="l-step" id="lStep">준비하고 있어요</p>
+        <p class="l-hint" id="lHint"></p>
+      </div>
+    </div>
   </section>
 
   <!-- 설정 등 아래에서 올라오는 창 -->

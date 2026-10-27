@@ -71,42 +71,72 @@ class Session {
     el.root.addEventListener("click", this.onClick);
     window.addEventListener("deviceorientation", this.onTilt);
     this.newExercise();
-    this.showPanel(`<p class="p-lead">카메라와 인식 모델을 준비하고 있어요</p><p class="p-hint">처음 한 번은 몇 초 걸릴 수 있어요</p>`);
+    this.el.panel.hidden = true;
+    this.el.controls.hidden = true;
+    this.showLoading("인식 모델을 불러오고 있어요");
     try {
       this.wake = await navigator.wakeLock?.request?.("screen").catch(() => null);
     } catch { /* 지원 안 함 */ }
     try {
       this.detector = await getDetector();
+      if (this.closed) return;
       if (DEMO) {
         this.srcW = 720; this.srcH = 1280; this.mirror = false;
         this.detector.setExercise(this.item.ex);
       } else if (this.kind === "video") {
+        this.showLoading("영상을 여는 중이에요");
         el.video.srcObject = null;
         el.video.src = URL.createObjectURL(this.opts.file);
         el.video.loop = false;
         this.mirror = false;
         await el.video.play();
       } else {
+        this.showLoading("카메라를 켜고 있어요");
         this.stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: store.settings.facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false,
         });
+        if (this.closed) { this.stream.getTracks().forEach((t) => t.stop()); return; }
         el.video.srcObject = this.stream;
         await el.video.play();
+        await firstFrame(el.video);
         this.mirror = store.settings.facing === "user";
       }
     } catch (e) {
       console.error(e);
+      if (this.closed) return;
+      this.hideLoading(true);
       this.showPanel(`<p class="p-lead">${esc(cameraError(e))}</p><div class="p-actions"><button class="btn primary" data-act="quit">닫기</button></div>`);
       return;
     }
+    if (this.closed) return;
     el.video.classList.toggle("mirror", !!this.mirror);
     if (this.kind === "video") this.startActive();
     else this.toPrepare();
+    this.hideLoading();
     this.raf = requestAnimationFrame(this.loop);
+  }
+
+  showLoading(step) {
+    const box = $("sLoading");
+    box.hidden = false;
+    box.classList.remove("hide");
+    $("lEx").textContent = this.kind === "routine" ? this.opts.title : this.def.display_name;
+    $("lStep").textContent = step;
+    const how = this.def.view === "side" ? "옆모습이 보이게" : this.def.view === "front" ? "정면이 보이게" : "";
+    $("lHint").textContent = this.kind === "video" ? "" : `그동안 폰을 세워두고${how ? ` ${how}` : ""} 한두 걸음 물러서 주세요`;
+  }
+
+  hideLoading(now = false) {
+    const box = $("sLoading");
+    if (now) { box.hidden = true; return; }
+    box.classList.add("hide");
+    setTimeout(() => { if (box.classList.contains("hide")) box.hidden = true; }, 320);
   }
 
   close(save) {
     const { el } = this;
+    this.closed = true;
+    this.hideLoading(true);
     cancelAnimationFrame(this.raf);
     this.stream?.getTracks().forEach((t) => t.stop());
     if (!el.video.paused) el.video.pause();
@@ -484,6 +514,16 @@ class Session {
     else if (this.phase === "countdown") this.toCountdown();
     else if (this.phase === "prepare") this.toPrepare();
   }
+}
+
+/** 카메라 첫 화면이 실제로 들어올 때까지 (최대 3초) */
+function firstFrame(video) {
+  if (video.videoWidth > 0 && video.readyState >= 2) return Promise.resolve();
+  return new Promise((ok) => {
+    const done = () => { clearTimeout(t); video.removeEventListener("loadeddata", done); ok(); };
+    const t = setTimeout(done, 3000);
+    video.addEventListener("loadeddata", done);
+  });
 }
 
 function gradeOf(s) { return s >= 90 ? "A" : s >= 80 ? "B" : s >= 70 ? "C" : s >= 60 ? "D" : "F"; }
