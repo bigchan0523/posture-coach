@@ -63,18 +63,24 @@ export function frontPose(p = {}) {
   const flat = {};
   const hipH = L.thigh + L.shank + L.ankleH;
   const drop = p.drop ?? 0; // 쪼그려 앉으면 엉덩이 높이가 내려감(정면에서는 높이 변화만 보임)
-  const hy = hipH - drop;
+  // p.squat: { thigh, shank, lean } (도) — 허벅지·정강이·상체가 카메라 쪽으로 기운 각도 → 화면에서는 그만큼 짧아 보임
+  const sq = p.squat;
+  const cos = (d) => Math.cos(rad(d ?? 0));
+  const kneeY = sq ? L.ankleH + L.shank * cos(sq.shank) : null;
+  const hy = sq ? kneeY + L.thigh * cos(sq.thigh) : hipH - drop;
+  const torsoLen = sq ? L.torso * cos(sq.lean) : L.torso;
   flat.hip_l = { x: 0.12, y: hy }; flat.hip_r = { x: -0.12, y: hy };
-  flat.sh_l = { x: 0.2, y: hy + L.torso }; flat.sh_r = { x: -0.2, y: hy + L.torso };
-  flat.nose = { x: 0, y: hy + L.torso + 0.2 };
-  flat.ear_l = { x: 0.07, y: hy + L.torso + 0.22 }; flat.ear_r = { x: -0.07, y: hy + L.torso + 0.22 };
+  flat.sh_l = { x: 0.2, y: hy + torsoLen }; flat.sh_r = { x: -0.2, y: hy + torsoLen };
+  flat.nose = { x: 0, y: hy + torsoLen + 0.2 };
+  flat.ear_l = { x: 0.07, y: hy + torsoLen + 0.22 }; flat.ear_r = { x: -0.07, y: hy + torsoLen + 0.22 };
   for (const [s, sg] of [["l", 1], ["r", -1]]) {
     const leg = (s === "l" ? p.legL : p.legR) || {};
     const abd = leg.abd ?? 0;
     const cave = (s === "l" ? p.caveL : p.caveR) ?? 0;
     const hip = flat[`hip_${s}`];
     const ankle = { x: hip.x + sg * Math.sin(rad(abd)) * (L.thigh + L.shank) + sg * 0.03, y: L.ankleH };
-    const knee = { x: (hip.x + ankle.x) / 2 - sg * cave, y: (hip.y + ankle.y) / 2 };
+    const t = sq ? (hip.y - kneeY) / (hip.y - ankle.y) : 0.5;
+    const knee = { x: hip.x + (ankle.x - hip.x) * t - sg * cave, y: sq ? kneeY : (hip.y + ankle.y) / 2 };
     flat[`knee_${s}`] = knee; flat[`ankle_${s}`] = ankle;
     flat[`heel_${s}`] = { x: ankle.x, y: 0.01 }; flat[`toe_${s}`] = { x: ankle.x + sg * 0.03, y: 0 };
     const arm = (s === "l" ? p.armL : p.armR) || p.arm || {};

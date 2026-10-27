@@ -50,6 +50,16 @@ export class BodyNormalizer {
     this.swapped = false;  // 측면에서 오른쪽이 더 잘 보여 좌우 이름을 바꿨는지
     this.facing = 1;       // 측면에서 바라보는 방향 (+1: 화면 오른쪽)
     this.facingEma = 0;
+    // 정면 촬영에서 '서 있을 때 길이' 기준 (앞으로 숙이거나 허벅지를 들면 화면에서 짧아 보이는 것으로 깊이 추정)
+    this.ref = { torso: null, thighL: null, thighR: null };
+  }
+
+  _ref(key, v, ok = true) {
+    if (!ok || !(v > 1)) return this.ref[key];
+    const r = this.ref[key];
+    // 길어질 때는 빨리(튀는 값 하나엔 덜 흔들리게 20%씩), 짧아질 때는 아주 천천히(약 15초) 따라감
+    this.ref[key] = r == null ? v : v > r ? 0.8 * r + 0.2 * v : 0.998 * r + 0.002 * v;
+    return this.ref[key];
   }
 
   /**
@@ -127,9 +137,34 @@ export class BodyNormalizer {
     // 몸이 누워 있을 때(어깨-발목이 가로로 몸통 길이 이상 떨어짐)만 의미 있음, 서 있으면 0
     const hipLineOffset = Math.abs(dx) > REF_TORSO ? Hp.y - (S.y + ((A.y - S.y) * (Hp.x - S.x)) / dx) : 0;
 
+    // 정면 촬영용: 옆에서 본 '어깨-엉덩이-무릎' 각도를 화면에서 짧아진 정도로 추정
+    //  허벅지가 카메라 쪽으로 θ만큼 들리면 길이가 cosθ배, 상체가 φ만큼 숙여지면 몸통이 cosφ배로 보임 → 각도 ≈ 180 - θ - φ
+    //  서 있을 때 흔들림(몇 %)으로 각도가 튀지 않게 95% 이상은 '안 숙임'으로 봄
+    const fold = (now, ref) => (ref ? (Math.acos(Math.min(1, Math.max(0, now / ref / 0.95))) * 180) / Math.PI : 0);
+    const seen = (a, b) => P(a).v > 0.5 && P(b).v > 0.5;
+    const thighL = dist(P("left_hip"), P("left_knee")), thighR = dist(P("right_hip"), P("right_knee"));
+    const refT = this._ref("torso", torso, seen("left_shoulder", "left_hip"));
+    const refL = this._ref("thighL", thighL, seen("left_hip", "left_knee"));
+    const refR = this._ref("thighR", thighR, seen("right_hip", "right_knee"));
+    const lean = fold(torso, refT);
+    const frontL = 180 - fold(thighL, refL) - lean, frontR = 180 - fold(thighR, refR) - lean;
+    // 정면 촬영용: 무릎이 엉덩이-발목 선보다 안쪽(몸 가운데 쪽)으로 들어간 정도 (+면 안쪽, 몸통=200 단위)
+    //  화면은 좌우반전 없는 원본이라 사람의 왼쪽이 +x
+    const kneeIn = (side, sign) => {
+      const h = points[`${side}_hip`], k = points[`${side}_knee`], a = points[`${side}_ankle`];
+      const dy = a.y - h.y;
+      if (Math.abs(dy) < 1) return 0;
+      const lineX = h.x + ((a.x - h.x) * (k.y - h.y)) / dy;
+      return sign * (lineX - k.x);
+    };
+
     return {
       points, index, view: this.view, swapped: this.swapped, facing: this.facing, scale, torsoPx: this.torsoEst,
-      derived: { trunk_lean: trunkLean, hip_line_offset: hipLineOffset },
+      derived: {
+        trunk_lean: trunkLean, hip_line_offset: hipLineOffset,
+        front_hip_angle: (frontL + frontR) / 2, front_hip_angle_left: frontL, front_hip_angle_right: frontR,
+        left_knee_in: kneeIn("left", 1), right_knee_in: kneeIn("right", -1),
+      },
     };
   }
 }

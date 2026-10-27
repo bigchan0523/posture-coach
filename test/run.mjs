@@ -89,14 +89,34 @@ console.log("스쿼트 (왼쪽 보고 섬, 오른쪽이 카메라 쪽, 멀리서
   check("같은 결과: 상체 과도 감지", r.repFaults.has("leaning_forward"));
   check("같은 결과: 얕은 회 감지", r.repFaults.has("not_deep_enough"));
 }
-console.log("스쿼트 (정면 촬영: 무릎 모임)");
+console.log("스쿼트 (정면 촬영)");
+{
+  // 다리를 어깨보다 넓게 벌리고(abd 12°) 정면에서 제대로 앉기 3번
+  const wide = { legL: { abd: 12 }, legR: { abd: 12 } };
+  const deep = (k) => frontPose({ ...wide, squat: { thigh: 80 * k, shank: 30 * k, lean: 30 * k } });
+  const ex = load("squat");
+  const segs = [stand(1, frontPose(wide))];
+  for (let i = 0; i < 3; i++) segs.push({ sec: 2, pose: (k) => deep(cycle(k)) }, stand(0.6, frontPose(wide)));
+  const r = play(ex, segs, {});
+  check("정면 인식", r.last.view === "front");
+  check("정면에서도 3회 셈", ex.counter === 3, `got ${ex.counter}`);
+  check("정면이라고 경고 안 함", !r.last.viewWarning);
+  check("넓은 자세를 무릎 모임으로 오해 안 함", !r.seen.has("knees_caving") && !r.seen.has("knees_caving_right"), [...r.seen.keys()].join(","));
+  check("제대로 앉으면 깊이 지적 없음", !r.repFaults.has("not_deep_enough"));
+}
 {
   const ex = load("squat");
   const segs = [stand(1, frontPose({}))];
-  segs.push({ sec: 2, pose: (k) => frontPose({ drop: 0.3 * cycle(k), caveL: 0.12 * cycle(k), caveR: 0.12 * cycle(k) }) });
+  segs.push({ sec: 2, pose: (k) => frontPose({ squat: { thigh: 45 * cycle(k), shank: 15 * cycle(k), lean: 15 * cycle(k) } }) }, stand(0.6, frontPose({})));
   const r = play(ex, segs, {});
-  check("정면 인식", r.last.view === "front");
-  check("측면 권장 경고 표시", r.last.viewWarning === "옆으로 서서 찍어주세요");
+  check("정면 얕은 스쿼트: 안 세고 깊이 지적", ex.counter === 0 && r.repFaults.has("not_deep_enough"), `count ${ex.counter} faults ${[...r.repFaults]}`);
+}
+{
+  const ex = load("squat");
+  const segs = [stand(1, frontPose({}))];
+  segs.push({ sec: 2, pose: (k) => frontPose({ squat: { thigh: 80 * cycle(k), shank: 30 * cycle(k), lean: 30 * cycle(k) }, caveL: 0.1 * cycle(k), caveR: 0.1 * cycle(k) }) });
+  const r = play(ex, segs, {});
+  check("정면 무릎 모임 감지", r.seen.has("knees_caving") && r.seen.has("knees_caving_right"));
 }
 
 // ---------- 런지 ----------

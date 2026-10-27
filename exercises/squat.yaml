@@ -5,12 +5,14 @@
 #  - knees_caving: 측면에서는 볼 수 없는 규칙이라 정면 촬영일 때만 적용, 오른쪽 무릎 규칙 추가
 #  - 폼 점수 속도 기준 추가 (원본은 스쿼트/푸시업에만 속도 감점이 있었음)
 #  - 메시지/이름 한국어화, view(촬영 방향) 추가
+#  - 정면 촬영 지원: 정면에서는 엉덩이 각도가 화면에 안 보여서, 허벅지·상체가 짧아 보이는 정도로 각도를 추정 (front_angles)
+#  - 무릎 모임: 원래 '무릎이 발목보다 안쪽'이라 다리를 넓게 벌리면 서 있기만 해도 걸림 → 엉덩이-발목 선보다 안쪽일 때로 변경
 
 name: squat
 display_name: 스쿼트
 type: repetition
-view: side
-description: 하체 기본 운동 — 옆에서 찍어주세요
+view: any
+description: 하체 기본 운동 — 옆에서 찍으면 가장 정확하고, 정면도 돼요
 target_muscles:
 - Quadriceps
 - Gluteus
@@ -37,6 +39,9 @@ angles:
     - right_hip
     - right_knee
     description: Sağ taraf gövde-bacak açısı
+front_angles:
+  primary: front_hip_angle
+  right_side: front_hip_angle_right
 state_order:
 - ascent
 - descent
@@ -67,7 +72,7 @@ feedback:
     message: 더 깊이 앉으세요
     severity: info
   knees_caving:
-    condition: left_knee_x < left_ankle_x - 20
+    condition: left_knee_in > 20
     view: front
     states:
     - descent
@@ -75,7 +80,7 @@ feedback:
     message: 왼무릎이 안으로 모여요. 무릎을 발끝 방향으로
     severity: warning
   knees_caving_right:
-    condition: right_knee_x > right_ankle_x + 20
+    condition: right_knee_in > 20
     view: front
     states:
     - descent

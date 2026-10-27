@@ -89,6 +89,8 @@ function normalizeConfig(cfg) {
     tempo: cfg.form_score?.tempo_range || null,
     holdState: cfg.hold_state && states[cfg.hold_state] ? cfg.hold_state : stateOrder[0],
     targetSec: cfg.target_duration ?? 30,
+    // 정면 촬영일 때 대신 쓸 값 (예: 스쿼트 primary → front_hip_angle)
+    frontAngles: cfg.front_angles || null,
     requiredPoints: [...new Set(Object.values(angles).flat())],
     visualization: cfg.visualization || {},
   };
@@ -161,10 +163,15 @@ export class Exercise {
 
     // 각도 (각도별 이동평균 — 원본 버그 수정)
     const angles = {};
+    if (c.frontAngles && frame.view !== this.lastView) {
+      for (const n of c.angleNames) this.history[n] = []; // 촬영 방향이 바뀌면 다른 값이 섞이지 않게
+    }
+    this.lastView = frame.view;
     for (const n of c.angleNames) {
       const [a, b, d] = c.angles[n].map((p) => frame.points[p]);
       const h = this.history[n];
-      h.push(angleAt(a, b, d));
+      const alt = frame.view === "front" && c.frontAngles?.[n];
+      h.push(alt ? frame.derived[alt] : angleAt(a, b, d));
       if (h.length > c.smoothWindow) h.shift();
       angles[n] = h.reduce((s, x) => s + x, 0) / h.length;
     }
