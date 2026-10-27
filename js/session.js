@@ -445,15 +445,19 @@ class Session {
     else if (act === "more") { this.restLeft += 15; this.showRest(); }
     else if (act === "pause") this.togglePause();
     else if (act === "skip") {
+      this.paused = false; // 일시정지 중에 눌러도 바로 다음으로
       if (this.phase === "active") this.finishSet(true);
       else if (this.phase === "rest" || this.phase === "prepare") { clearInterval(this.timer); this.toCountdown(); }
     } else if (act === "close") {
       if (this.phase === "summary") return this.close(true);
       this.paused = true;
+      // 쉬는 시간·카운트다운 타이머를 멈춰야 확인창을 덮어쓰지 않음 (계속하기 누르면 이어서 진행)
+      clearInterval(this.timer);
       this.prevPanel = this.el.panel.hidden ? null : this.el.panel.innerHTML;
-      this.el.video.pause?.();
+      if (this.kind === "video") this.el.video.pause();
       this.showPanel(`<h2 class="p-title">운동을 끝낼까요?</h2><p class="p-hint">지금까지 한 기록은 저장돼요</p>
         <div class="p-actions"><button class="btn" data-act="resume">계속하기</button><button class="btn primary" data-act="end">끝내기</button></div>`);
+      this.el.controls.hidden = true;
     } else if (act === "resume") this.resume();
     else if (act === "end") {
       this.paused = false;
