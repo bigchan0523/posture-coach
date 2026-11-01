@@ -388,3 +388,4 @@ body.in-session .tabbar { display: none; }
 .trk-preview figcaption { font-size: 13px; color: var(--muted); font-weight: 600; padding-bottom: 4px; }
 .trk-angles { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 6px; font-size: 14px; color: var(--muted); }
 .trk-angles b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.trk-diag { margin-top: 8px; line-height: 1.6; word-break: break-all; }

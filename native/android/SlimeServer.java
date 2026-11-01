@@ -74,6 +74,9 @@ public class SlimeServer {
     private Thread thread;
     private volatile boolean running;
     private volatile String error;
+    // 연결 문제 확인용: 무엇이든 받은 패킷 수, 마지막 보낸 곳, 핸드셰이크 수
+    private volatile long packets, handshakes;
+    private volatile String lastFrom;
     private final List<String> log = new ArrayList<>();
 
     public SlimeServer() { this(PORT); }
@@ -191,13 +194,15 @@ public class SlimeServer {
 
     // ---------- 패킷 처리 ----------
     void handle(DatagramPacket p) throws Exception {
+        packets++;
+        lastFrom = p.getAddress().getHostAddress();
         if (p.getLength() < 4) return;
         ByteBuffer bb = ByteBuffer.wrap(p.getData(), p.getOffset(), p.getLength()).order(ByteOrder.BIG_ENDIAN);
         int type = bb.getInt();
         long number = bb.remaining() >= 8 ? bb.getLong() : 0;
         long now = System.currentTimeMillis();
 
-        if (type == 3) { handshake(p, bb, now); return; }
+        if (type == 3) { handshakes++; handshake(p, bb, now); return; }
 
         Device d;
         synchronized (this) { d = byAddress.get(p.getSocketAddress()); }
@@ -362,6 +367,8 @@ public class SlimeServer {
         long now = System.currentTimeMillis();
         StringBuilder sb = new StringBuilder("{\"running\":").append(running);
         if (error != null) sb.append(",\"error\":").append(q(error));
+        sb.append(",\"packets\":").append(packets).append(",\"handshakes\":").append(handshakes);
+        if (lastFrom != null) sb.append(",\"lastFrom\":").append(q(lastFrom));
         sb.append(",\"trackers\":[");
         boolean first = true;
         synchronized (this) {

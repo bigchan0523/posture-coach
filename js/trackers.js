@@ -219,6 +219,7 @@ class TrackerRig {
   onState(s) {
     const now = performance.now();
     this.ips = s.ips || this.ips;
+    this.net = { packets: s.packets ?? 0, handshakes: s.handshakes ?? 0, lastFrom: s.lastFrom || null };
     if (s.log?.length) this.log = [...this.log, ...s.log].slice(-30);
     if (s.error) this.error = s.error;
     for (const t of s.trackers || []) {

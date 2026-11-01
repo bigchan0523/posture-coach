@@ -37,6 +37,8 @@ export function trackersScreen(backBar) {
       <ul>
         <li>폰과 트래커가 <b>같은 와이파이</b>에 있어야 해요. 트래커에 저장된 와이파이를 그대로 쓰거나, 폰 핫스팟 이름·비밀번호를 그 와이파이와 똑같이 맞추면 밖에서도 돼요.</li>
         <li><b>PC의 SlimeVR 서버는 꺼주세요.</b> 켜져 있으면 트래커가 PC 쪽에 붙어요. 공식 SlimeVR 안드로이드 앱도 같이 켜두면 안 돼요 (같은 6969 포트 사용).</li>
+        <li>폰 핫스팟을 쓸 때는 <b>핫스팟 화면의 ‘연결된 기기’에 트래커가 보이는지</b> 먼저 확인하세요. 안 보이면 이름·비밀번호·2.4GHz·보안(WPA2) 문제예요.</li>
+        <li>‘받은 신호’가 0이면 트래커 신호가 폰까지 안 오는 거고, 늘어나는데 연결이 0개면 앱 문제예요. 캡처해서 알려주세요.</li>
         <li>트래커 전원을 껐다 켜면 몇 초 안에 다시 붙어요.</li>
       </ul>
     </details>
@@ -94,12 +96,14 @@ function update() {
   const $ = (id) => document.getElementById(id);
   const conn = $("trkConn");
   if (!conn) return;
-  const ip = (rig.ips || []).map((s) => s.split(" ").pop()).join(", ");
-  conn.innerHTML = rig.running
-    ? `<div class="trk-status on"><i></i><div><b>트래커 기다리는 중 · ${rig.list().filter((t) => t.connected).length}개 연결</b><span class="muted small">폰 주소 ${esc(ip || "-")} · 포트 6969</span></div>
+  const ip = (rig.ips || []).join(", ");
+  const n = rig.net || {};
+  const diag = rig.running ? `<p class="muted small trk-diag">받은 신호 ${n.packets || 0}개 · 연결 요청 ${n.handshakes || 0}번${n.lastFrom ? ` · 마지막 ${esc(n.lastFrom)}` : ""}<br>폰 네트워크: ${esc(ip || "-")}${rig.log?.length ? `<br>${rig.log.slice(-3).map(esc).join("<br>")}` : ""}</p>` : "";
+  conn.innerHTML = (rig.running
+    ? `<div class="trk-status on"><i></i><div><b>트래커 기다리는 중 · ${rig.list().filter((t) => t.connected).length}개 연결</b><span class="muted small">포트 6969에서 기다리는 중</span></div>
         <button class="text-btn" data-act="trk-stop">끄기</button></div>`
     : `<div class="trk-status"><i></i><div><b>꺼져 있음</b>${rig.error ? `<span class="error">${esc(rig.error)}</span>` : `<span class="muted small">켜면 같은 와이파이의 트래커가 자동으로 연결돼요</span>`}</div>
-        <button class="btn primary" data-act="trk-start">켜기</button></div>`;
+        <button class="btn primary" data-act="trk-start">켜기</button></div>`) + diag;
 
   $("trkParts").innerHTML = PARTS.map((p) => {
     const t = rig.tracker(p.id);
