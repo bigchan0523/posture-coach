@@ -139,7 +139,11 @@ export class Exercise {
    * @param tMs 타임스탬프(ms) — 실시간은 performance.now(), 영상은 currentTime*1000
    * @param W,H 영상 해상도
    */
-  update(lms, tMs, W, H) {
+  /**
+   * opts.derived: 바깥(트래커 3D 뼈대)에서 계산한 값으로 덮어쓰기
+   * opts.allViews: 촬영 방향 조건(view:)을 무시하고 모든 규칙 적용 (트래커는 정면·옆을 동시에 앎)
+   */
+  update(lms, tMs, W, H, opts = {}) {
     const c = this.cfg;
     const result = { tracking: false, counted: false, feedback: [], repDone: null };
 
@@ -150,7 +154,8 @@ export class Exercise {
     const frame = this.body.process(lms, W, H);
     result.view = frame.view;
     result.pointIndex = frame.index;
-    if (c.view !== "any" && frame.view && frame.view !== c.view) {
+    if (opts.derived) Object.assign(frame.derived, opts.derived);
+    if (!opts.allViews && c.view !== "any" && frame.view && frame.view !== c.view) {
       result.viewWarning = c.view === "side" ? "옆으로 서서 찍어주세요" : "카메라 정면을 봐주세요";
     }
 
@@ -188,8 +193,9 @@ export class Exercise {
     Object.assign(ctx, frame.derived);
     result.derived = frame.derived;
 
-    if (c.type === "duration") this._updateDuration(ctx, tMs, frame.view, result);
-    else for (const ch of this.channels) this._updateChannel(ch, ctx, angles, tMs, frame.view, result);
+    const fview = opts.allViews ? "*" : frame.view;
+    if (c.type === "duration") this._updateDuration(ctx, tMs, fview, result);
+    else for (const ch of this.channels) this._updateChannel(ch, ctx, angles, tMs, fview, result);
 
     return this._finish(result);
   }
@@ -211,7 +217,7 @@ export class Exercise {
     const active = [];
     for (const f of this.cfg.feedback) {
       if (f.check !== "live") continue;
-      if (f.view && f.view !== view) { delete ch.fbSince[f.name]; continue; }
+      if (f.view && view !== "*" && f.view !== view) { delete ch.fbSince[f.name]; continue; }
       if (f.states && !f.states.includes(ch.state)) { delete ch.fbSince[f.name]; continue; }
       if (f.test(ctx)) {
         ch.fbSince[f.name] ??= tMs;
@@ -294,7 +300,7 @@ export class Exercise {
       if (n === "primary") { repCtx.rep_min_angle = v; repCtx.rep_max_angle = rep.max[n]; }
     }
     for (const f of c.feedback) {
-      if (f.check !== "rep_end" || (f.view && f.view !== view)) continue;
+      if (f.check !== "rep_end" || (f.view && view !== "*" && f.view !== view)) continue;
       if (f.test(repCtx) && f.severity !== "success") rep.faults.set(f.name, f);
     }
 

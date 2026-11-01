@@ -26,6 +26,9 @@ jobs:
       - name: 엔진 테스트
         run: node test/run.mjs
 
+      - name: 트래커 수신기 테스트 (가짜 트래커)
+        run: bash native/test/run.sh
+
       - name: 패키지 설치
         run: npm install --no-audit --no-fund
 
@@ -37,13 +40,16 @@ jobs:
           npx cap add android
           MANIFEST=android/app/src/main/AndroidManifest.xml
           # 카메라 권한 (WebView에서 getUserMedia 사용)
-          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />#' "$MANIFEST"
+          # 와이파이 트래커(SlimeVR) 수신: 브로드캐스트를 받으려면 멀티캐스트 잠금 권한 필요
+          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />\n    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />#' "$MANIFEST"
           # 운동 중 화면 회전으로 앱이 다시 시작되지 않게 세로 고정
           sed -i 's#android:name=".MainActivity"#android:name=".MainActivity"\n            android:screenOrientation="portrait"#' "$MANIFEST"
-          grep -n "CAMERA\|portrait" "$MANIFEST"
+          grep -n "CAMERA\|MULTICAST\|portrait" "$MANIFEST"
           # 앱이 켜져 있는 동안 화면이 꺼지지 않게 (운동 중 화면 꺼짐 방지)
           MAIN=$(find android/app/src/main/java -name MainActivity.java)
           PKG=$(head -1 "$MAIN")
+          # 트래커 수신 플러그인 (native/android) 복사
+          cp native/android/*.java "$(dirname "$MAIN")"/
           cat > "$MAIN" <<JAVA
           $PKG
 
@@ -54,6 +60,7 @@ jobs:
           public class MainActivity extends BridgeActivity {
               @Override
               public void onCreate(Bundle savedInstanceState) {
+                  registerPlugin(SlimeVRPlugin.class);
                   super.onCreate(savedInstanceState);
                   getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
               }

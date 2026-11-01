@@ -6,6 +6,7 @@ import { AREAS, areaOf, PRESETS, LEVELS, VIEW_TEXT, scaled, estimateMinutes, tot
 import { weekdayBars, trendLine, monthCalendar, rings, dayFractions, RING_COLORS } from "./charts.js";
 import { sfx } from "./sound.js";
 import { PICTOS } from "./pictos.js";
+import { trackersScreen, mountTrackers, unmountTrackers, onTrackerAct, trackerSummary } from "./trackers-ui.js";
 
 const defs = {};
 let names = [];
@@ -32,6 +33,7 @@ const ICON = {
   camera: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
   film: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M10 9.5v5l4-2.5z"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  tracker: '<svg viewBox="0 0 24 24"><rect x="6" y="8" width="12" height="12" rx="3.5"/><path d="M9 4.8a5 5 0 0 1 6 0M10.6 2.8"/><circle cx="12" cy="14" r="1.6"/></svg>',
   trash: '<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></svg>',
 };
 
@@ -57,10 +59,12 @@ function render() {
   document.querySelectorAll(".tabbar button").forEach((b) => b.setAttribute("aria-current", b.dataset.tab === ui.tab ? "page" : "false"));
   const top = ui.stack[ui.stack.length - 1];
   let html;
-  if (top) html = { routine: routineScreen, exercise: exerciseScreen, editor: editorScreen, record: recordScreen }[top.type](top);
+  unmountTrackers();
+  if (top) html = { routine: routineScreen, exercise: exerciseScreen, editor: editorScreen, record: recordScreen, trackers: () => trackersScreen(backBar) }[top.type](top);
   else html = { home: homeScreen, workouts: workoutsScreen, records: recordsScreen }[ui.tab]();
   $view.innerHTML = html;
   $view.scrollTop = 0;
+  if (top?.type === "trackers") mountTrackers();
 }
 
 function push(screen) { ui.stack.push(screen); render(); window.scrollTo(0, 0); }
@@ -118,6 +122,11 @@ function homeScreen() {
       <button class="picker" data-act="pick-ex" data-for="test" aria-label="테스트할 운동 고르기">${mark(ui.testEx)}<span>${esc(exName(ui.testEx))}</span>${ICON.down}</button>
       <button class="btn primary" data-act="start-test">테스트</button>
     </div>
+  </section>
+
+  <section class="block">
+    <h3>측정 방법</h3>
+    ${(() => { const t = trackerSummary(); return `<button class="row trk-entry" data-act="open-trackers"><span class="mark plain">${ICON.tracker}</span><div class="row-main"><b>${t.src}</b><span class="muted">${esc(t.line)}</span></div>${ICON.chev}</button>`; })()}
   </section>
 
   <section class="block">
@@ -325,6 +334,7 @@ function openSettings() {
   $sheet.querySelector(".sheet").classList.remove("tall");
   $sheet.querySelector(".sheet").innerHTML = `
     <div class="sheet-head"><h2>설정</h2><button class="text-btn" data-act="close-sheet">닫기</button></div>
+    <button class="row" data-act="open-trackers"><span class="mark plain">${ICON.tracker}</span><div class="row-main"><b>측정 방법 · 모션 트래커</b><span class="muted">${esc(trackerSummary().src)}</span></div>${ICON.chev}</button>
     <div class="field"><span>카메라</span>${seg("facing", [["user", "앞쪽 (화면 보며)"], ["environment", "뒤쪽 (남이 찍기)"]])}</div>
     <div class="field"><span>인식 정확도</span>${seg("model", [["lite", "빠르게"], ["full", "정확하게"]])}</div>
     <div class="field"><span>세트 사이 휴식</span>${seg("restSec", [[15, "15초"], [30, "30초"], [45, "45초"], [60, "60초"], [90, "90초"]])}</div>
@@ -353,6 +363,7 @@ function start(kind, title, items, file) {
   runSession(defs, {
     kind, title, items, file,
     onClose: (saved) => { render(); if (saved) toast("기록을 저장했어요"); },
+    onTrackerSetup: () => { ui.stack = [{ type: "trackers" }]; render(); },
   });
 }
 const testItem = (ex) => (isHold(ex) ? { ex, sets: 1, sec: 30 } : { ex, sets: 1, reps: 10 });
@@ -371,8 +382,10 @@ $view.addEventListener("click", (e) => {
   if (!b || b.tagName === "SELECT" || b.tagName === "INPUT") return;
   const { act, id, ex } = b.dataset;
   const top = ui.stack[ui.stack.length - 1];
+  if (act?.startsWith("trk-") && onTrackerAct(act, b, render)) return;
   switch (act) {
     case "back": return pop();
+    case "open-trackers": return push({ type: "trackers" });
     case "seg":
       if (b.dataset.key === "level") { top.level = b.dataset.val; return render(); }
       ui[b.dataset.key] = b.dataset.val; return render();
@@ -508,6 +521,7 @@ $sheet.addEventListener("click", (e) => {
   const b = e.target.closest("[data-act],[data-set]");
   if (!b) return;
   if (b.dataset.act === "close-sheet") { $sheet.hidden = true; return render(); }
+  if (b.dataset.act === "open-trackers") { $sheet.hidden = true; ui.stack.push({ type: "trackers" }); return render(); }
   if (b.dataset.act === "reset-data") {
     if (!ui.confirmReset) { ui.confirmReset = true; return openSettings(); }
     store.resetAll(); ui.confirmReset = false; $sheet.hidden = true; toast("기록을 모두 지웠어요"); return render();

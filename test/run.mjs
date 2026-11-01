@@ -6,6 +6,7 @@ import yaml from "../js/vendor/js-yaml.mjs";
 import { Exercise } from "../js/engine.js";
 import { compile } from "../js/condition.js";
 import { sidePose, frontPose, toLandmarks, cycle } from "./sim.mjs";
+import { runTrackerTests } from "./trackers.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const load = (name) => new Exercise(yaml.load(readFileSync(join(root, "exercises", `${name}.yaml`), "utf8")));
@@ -229,6 +230,9 @@ console.log("관절이 안 보일 때");
   const r = ex.update(lm, 0, W, H);
   check("판정 멈추고 안내", r.tracking === false && r.message);
 }
+
+// ---------- 와이파이 트래커 ----------
+runTrackerTests(check);
 
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

@@ -5,12 +5,15 @@ import { drawPose } from "./overlay.js";
 import { store } from "./store.js";
 import { sfx, say } from "./sound.js";
 import { VIEW_TEXT } from "./routines.js";
+import { rig, fuse, TRACKER_EXERCISES } from "./trackers.js";
 
 const DEMO = new URLSearchParams(location.search).has("demo");
 const $ = (id) => document.getElementById(id);
 // 어깨·엉덩이·무릎·발목: 좌우 중 한쪽만 잘 보여도 됨 (옆모습은 반대쪽이 가려짐)
 const BODY_PAIRS = [[11, 12], [23, 24], [25, 26], [27, 28]];
 const RING_C = 2 * Math.PI * 52;
+// 누워서·엎드려서 시작하는 운동 (트래커 모드에서 '똑바로 서기'를 기다리지 않음)
+const LYING = ["glute_bridge", "leg_raise", "mountain_climber", "plank", "push_up"];
 
 let detector = null;
 
@@ -49,6 +52,8 @@ class Session {
     this.paused = false;
     this.results = this.items.map((it) => ({ ex: it.ex, name: defs[it.ex].display_name, sets: [] }));
     this.t0 = Date.now();
+    // 측정 방법: camera | trackers | both (영상 분석은 항상 카메라 방식)
+    this.source = opts.kind === "video" ? "camera" : store.settings.source || "camera";
     this.el = {
       root: $("session"), video: $("sVideo"), canvas: $("sCanvas"), title: $("sTitle"), sub: $("sSub"),
       notice: $("sNotice"), ring: $("sRing"), ringBar: $("sRingBar"), count: $("sCount"), target: $("sTarget"),
@@ -61,6 +66,13 @@ class Session {
   }
 
   get item() { return this.items[this.itemIdx]; }
+  /** 이 운동을 무엇으로 측정할지: 트래커로 못 하는 운동(팔 동작 등)은 카메라로 */
+  mode(ex = this.item.ex) {
+    if (this.source === "camera" || !TRACKER_EXERCISES.includes(ex)) return "camera";
+    return this.source;
+  }
+  get needCamera() { return this.items.some((it) => this.mode(it.ex) !== "trackers"); }
+  get needTrackers() { return this.items.some((it) => this.mode(it.ex) !== "camera"); }
   get def() { return this.defs[this.item.ex]; }
 
   // ---------- 열기/닫기 ----------
@@ -71,48 +83,74 @@ class Session {
     el.root.addEventListener("click", this.onClick);
     window.addEventListener("deviceorientation", this.onTilt);
     this.newExercise();
-    this.el.panel.hidden = true;
-    this.el.controls.hidden = true;
-    this.showLoading("인식 모델을 불러오고 있어요");
     try {
       this.wake = await navigator.wakeLock?.request?.("screen").catch(() => null);
     } catch { /* 지원 안 함 */ }
-    try {
-      this.detector = await getDetector();
+    await this.boot();
+  }
+
+  /** 측정 준비 (카메라·인식 모델·트래커). '카메라로 하기'를 누르면 다시 불림 */
+  async boot() {
+    const { el } = this;
+    this.el.panel.hidden = true;
+    this.el.controls.hidden = true;
+    if (this.needTrackers) {
+      this.showLoading("트래커 연결을 확인하고 있어요");
+      await rig.start();
       if (this.closed) return;
-      if (DEMO) {
-        this.srcW = 720; this.srcH = 1280; this.mirror = false;
-        this.detector.setExercise(this.item.ex);
-      } else if (this.kind === "video") {
-        this.showLoading("영상을 여는 중이에요");
-        el.video.srcObject = null;
-        el.video.src = URL.createObjectURL(this.opts.file);
-        el.video.loop = false;
-        this.mirror = false;
-        await el.video.play();
-      } else {
-        this.showLoading("카메라를 켜고 있어요");
-        this.stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: store.settings.facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false,
-        });
-        if (this.closed) { this.stream.getTracks().forEach((t) => t.stop()); return; }
-        el.video.srcObject = this.stream;
-        await el.video.play();
-        await firstFrame(el.video);
-        this.mirror = store.settings.facing === "user";
+      if (DEMO) { rig.setDemoScene("stand"); await new Promise((ok) => setTimeout(ok, 300)); }
+      if (!rig.ready) {
+        this.hideLoading(true);
+        const why = rig.error ? rig.error
+          : rig.assignedCount < 5 ? "트래커 부위 지정이 아직 안 됐어요"
+          : rig.liveCount < 5 ? `트래커 ${rig.liveCount}개만 연결돼 있어요. 전원과 와이파이를 확인해주세요`
+          : "트래커 보정(똑바로 서기 → 살짝 앉기)을 먼저 해주세요";
+        this.showPanel(`<h2 class="p-title">트래커 준비가 안 됐어요</h2><p class="p-lead">${esc(why)}</p>
+          <div class="p-actions"><button class="btn" data-act="use-camera">카메라로 하기</button><button class="btn primary" data-act="tracker-setup">트래커 설정</button></div>`);
+        this.el.controls.hidden = true;
+        return;
       }
-    } catch (e) {
-      console.error(e);
-      if (this.closed) return;
-      this.hideLoading(true);
-      this.showPanel(`<p class="p-lead">${esc(cameraError(e))}</p><div class="p-actions"><button class="btn primary" data-act="quit">닫기</button></div>`);
-      return;
+    }
+    if (this.needCamera) {
+      this.showLoading("인식 모델을 불러오고 있어요");
+      try {
+        this.detector = await getDetector();
+        if (this.closed) return;
+        if (DEMO) {
+          this.srcW = 720; this.srcH = 1280; this.mirror = false;
+          this.detector.setExercise(this.item.ex);
+        } else if (this.kind === "video") {
+          this.showLoading("영상을 여는 중이에요");
+          el.video.srcObject = null;
+          el.video.src = URL.createObjectURL(this.opts.file);
+          el.video.loop = false;
+          this.mirror = false;
+          await el.video.play();
+        } else if (!this.stream) {
+          this.showLoading("카메라를 켜고 있어요");
+          this.stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: store.settings.facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false,
+          });
+          if (this.closed) { this.stream.getTracks().forEach((t) => t.stop()); return; }
+          el.video.srcObject = this.stream;
+          await el.video.play();
+          await firstFrame(el.video);
+          this.mirror = store.settings.facing === "user";
+        }
+      } catch (e) {
+        console.error(e);
+        if (this.closed) return;
+        this.hideLoading(true);
+        this.showPanel(`<p class="p-lead">${esc(cameraError(e))}</p><div class="p-actions"><button class="btn primary" data-act="quit">닫기</button></div>`);
+        return;
+      }
     }
     if (this.closed) return;
     el.video.classList.toggle("mirror", !!this.mirror);
     if (this.kind === "video") this.startActive();
     else this.toPrepare();
     this.hideLoading();
+    cancelAnimationFrame(this.raf);
     this.raf = requestAnimationFrame(this.loop);
   }
 
@@ -123,7 +161,9 @@ class Session {
     $("lEx").textContent = this.kind === "routine" ? this.opts.title : this.def.display_name;
     $("lStep").textContent = step;
     const how = this.def.view === "side" ? "옆모습이 보이게" : this.def.view === "front" ? "정면이 보이게" : "";
-    $("lHint").textContent = this.kind === "video" ? "" : `그동안 폰을 세워두고${how ? ` ${how}` : ""} 한두 걸음 물러서 주세요`;
+    $("lHint").textContent = this.kind === "video" ? ""
+      : !this.needCamera ? "트래커로 측정해요. 폰은 아무 데나 둬도 돼요"
+      : `그동안 폰을 세워두고${how ? ` ${how}` : ""} 한두 걸음 물러서 주세요`;
   }
 
   hideLoading(now = false) {
@@ -170,13 +210,18 @@ class Session {
     this.detector?.setExercise?.(this.item.ex);
   }
 
+  /** 데모: 가짜 트래커가 지금 단계에 맞는 동작을 하게 */
+  demoScene(scene) { if (DEMO && rig.running) rig.setDemoScene(scene); }
+
   setHeader() {
     const it = this.item;
     const { el } = this;
     el.title.textContent = this.def.display_name;
     const parts = [];
     if (this.kind === "routine" || this.kind === "test") parts.push(`${this.setIdx + 1} / ${it.sets}세트`);
-    parts.push(VIEW_TEXT[this.def.view] || "");
+    const m = this.mode();
+    parts.push(m === "trackers" ? "트래커로 측정" : m === "both" ? `${VIEW_TEXT[this.def.view] || ""} + 트래커` : VIEW_TEXT[this.def.view] || "");
+    el.root.classList.toggle("trk", m === "trackers");
     el.sub.textContent = parts.filter(Boolean).join("  ");
   }
 
@@ -185,12 +230,16 @@ class Session {
     this.readySince = null;
     this.setHeader();
     const it = this.item;
-    const direction = this.def.view === "side" ? "폰을 세워두고 옆으로 서주세요" : this.def.view === "front" ? "폰을 세워두고 정면을 봐주세요" : "폰을 세워두고 서주세요";
+    const trk = this.mode() === "trackers";
+    this.demoScene("stand");
+    const direction = trk ? (LYING.includes(it.ex) ? "운동 자세를 잡아주세요" : "똑바로 서주세요")
+      : this.def.view === "side" ? "폰을 세워두고 옆으로 서주세요" : this.def.view === "front" ? "폰을 세워두고 정면을 봐주세요" : "폰을 세워두고 서주세요";
+    const when = trk ? "잠깐 멈춰 있으면 자동으로 시작해요" : "머리부터 발까지 화면에 들어오면 자동으로 시작해요";
     this.showPanel(`
       <p class="p-kicker">${this.itemIdx + 1}번째 운동</p>
       <h2 class="p-title">${esc(this.def.display_name)}</h2>
       <p class="p-lead">${esc(direction)}</p>
-      <p class="p-hint">머리부터 발까지 화면에 들어오면 자동으로 시작해요${fmtTarget(it) ? `. 목표는 ${fmtTarget(it)}` : ""}</p>
+      <p class="p-hint">${when}${fmtTarget(it) ? `. 목표는 ${fmtTarget(it)}` : ""}</p>
       <p class="p-tilt" id="pTilt" hidden></p>
       <div class="p-actions"><button class="btn primary" data-act="start">바로 시작</button></div>`);
     this.updateRing(0);
@@ -216,6 +265,7 @@ class Session {
 
   startActive() {
     this.phase = "active";
+    this.demoScene(this.item.ex);
     this.exercise.reset();
     this.lastReps = 0;
     this.finishAt = null;
@@ -264,6 +314,7 @@ class Session {
 
   toRest(newExercise) {
     this.phase = "rest";
+    this.demoScene("stand");
     this.restLeft = store.settings.restSec;
     const next = this.item;
     this.restText = newExercise
@@ -330,8 +381,17 @@ class Session {
   loop() {
     this.raf = requestAnimationFrame(this.loop);
     const v = this.el.video;
-    let lms, W, H, tMs;
-    if (DEMO) {
+    const m = this.mode();
+    let lms, W, H, tMs, opts = {};
+    this.drawMirror = this.mirror;
+    if (m !== "camera" && this.phase !== "active") this.maybeRecalibrate();
+    if (m === "trackers") {
+      if (this.phase === "summary") return;
+      const t = rig.landmarks(this.def.view === "front" ? "front" : "side");
+      lms = t?.lm ?? null; W = t?.W ?? 720; H = t?.H ?? 1280; tMs = performance.now();
+      opts = { allViews: true, derived: t?.derived };
+      this.drawMirror = false;
+    } else if (DEMO) {
       if (this.phase === "summary") return;
       lms = this.detector.detect(); W = this.srcW; H = this.srcH; tMs = performance.now();
     } else {
@@ -342,10 +402,22 @@ class Session {
       W = v.videoWidth; H = v.videoHeight;
       tMs = this.kind === "video" ? v.currentTime * 1000 : performance.now();
     }
+    if (m === "both") {
+      // 카메라 관절에 트래커 뼈대를 맞춰 끼움. 카메라에서 사람이 안 보이면 트래커만으로 계속
+      const f = fuse(lms, W, H);
+      if (f) { lms = f.lm; opts = { derived: f.derived }; }
+      else {
+        const t = rig.landmarks(this.def.view === "front" ? "front" : "side");
+        if (t) { lms = t.lm; W = t.W; H = t.H; opts = { allViews: true, derived: t.derived }; this.drawMirror = false; }
+      }
+    }
 
     let r = null;
-    if (this.phase === "active" && !this.paused) {
-      r = this.exercise.update(lms, tMs, W, H);
+    if (m === "trackers" && !lms) {
+      this.setNotice("트래커 연결이 끊겼어요. 트래커 전원과 와이파이를 확인해주세요");
+      if (this.phase === "prepare") this.readySince = null;
+    } else if (this.phase === "active" && !this.paused) {
+      r = this.exercise.update(lms, tMs, W, H, opts);
       this.onResult(r);
     } else if (this.phase === "prepare" && !this.paused) {
       this.checkReady(lms);
@@ -353,9 +425,29 @@ class Session {
     this.draw(lms, W, H, r);
   }
 
-  checkReady(lms) {
-    const visible = lms && BODY_PAIRS.every(([a, b]) => Math.max(lms[a].visibility ?? 1, lms[b].visibility ?? 1) > 0.6);
+  /** 쉬는 시간·준비 중에 똑바로 서서 가만히 있으면 트래커 방향 틀어짐(드리프트)을 조용히 다시 맞춤 */
+  maybeRecalibrate() {
     const now = performance.now();
+    if (!rig.standingStill()) { this.stillSince = null; return; }
+    this.stillSince ??= now;
+    if (now - this.stillSince > 1000 && now - (this.lastRecal || 0) > 5000) {
+      rig.calibrateStand();
+      this.lastRecal = now;
+    }
+  }
+
+  checkReady(lms) {
+    const now = performance.now();
+    if (this.mode() === "trackers") {
+      // 트래커만: 2초 동안 가만히 있으면 시작 (선 자세 운동은 똑바로 서 있을 때)
+      const ok = LYING.includes(this.item.ex) ? rig.allStill() : rig.standingStill();
+      this.setNotice(ok ? "" : LYING.includes(this.item.ex) ? "자세를 잡고 잠깐 멈춰주세요" : "똑바로 서서 잠깐 멈춰주세요");
+      if (!ok) { this.readySince = null; return; }
+      this.readySince ??= now;
+      if (now - this.readySince > 2000) this.toCountdown();
+      return;
+    }
+    const visible = lms && BODY_PAIRS.every(([a, b]) => Math.max(lms[a].visibility ?? 1, lms[b].visibility ?? 1) > 0.6);
     const tiltEl = document.getElementById("pTilt");
     if (tiltEl) {
       const off = this.tilt == null ? 0 : Math.abs(Math.abs(this.tilt) - 90);
@@ -430,7 +522,7 @@ class Session {
     if (c.width !== Math.round(c.clientWidth * dpr)) { c.width = Math.round(c.clientWidth * dpr); c.height = Math.round(c.clientHeight * dpr); }
     const alert = r?.feedback?.some((f) => f.severity === "warning" || f.severity === "error");
     drawPose(c.getContext("2d"), lms, {
-      srcW: W, srcH: H, mirror: this.mirror,
+      srcW: W, srcH: H, mirror: this.drawMirror ?? this.mirror,
       visualization: r ? this.exercise.cfg.visualization : null,
       pointIndex: r?.pointIndex, angles: r?.angles, alert,
     });
@@ -495,6 +587,8 @@ class Session {
       this.toSummary();
     } else if (act === "done") this.close(true);
     else if (act === "quit") this.close(false);
+    else if (act === "use-camera") { this.source = "camera"; this.boot(); }
+    else if (act === "tracker-setup") { this.close(false); this.opts.onTrackerSetup?.(); }
   }
 
   togglePause() {
