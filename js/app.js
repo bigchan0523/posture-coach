@@ -591,10 +591,9 @@ const G_LOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335"
 function renderWelcome() {
   const busy = account.status === "signing" || account.status === "syncing";
   $welcome.innerHTML = `
-    <div class="w-top"><img src="img/logo.svg" alt=""><h1>자코자코</h1><p>카메라와 트래커로<br>운동 자세를 바로잡아요</p></div>
+    <div class="w-top"><img src="img/logo.svg" alt=""><h1>자코자코</h1><p>오늘의 운동 습관</p></div>
     <div class="w-bottom">
       <button class="w-google" data-act="w-google" ${busy ? "disabled" : ""}>${G_LOGO}<span>${account.status === "signing" ? "로그인 중…" : account.status === "syncing" ? "기록 불러오는 중…" : "Google로 시작하기"}</span></button>
-      <p class="w-note">처음이면 자동으로 가입돼요. 운동 기록이 계정에 저장돼서<br>앱을 다시 깔거나 폰을 바꿔도 그대로 남아요</p>
       ${account.error ? `<p class="w-err">${esc(account.error)}</p>` : ""}
       <button class="w-skip" data-act="w-skip">로그인 없이 시작하기</button>
     </div>`;

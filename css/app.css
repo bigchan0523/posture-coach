@@ -429,7 +429,7 @@ body.in-session .tabbar { display: none; }
 .w-top img { width: 96px; height: 96px; }
 .w-top h1 { font-size: 34px; font-weight: 900; letter-spacing: -0.03em; margin: 6px 0 0;
   background-image: linear-gradient(90deg, #74ccff, #3ea4ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.w-top p { color: var(--muted); font-size: 17px; line-height: 1.5; margin: 0; }
+.w-top p { color: var(--muted); font-size: 18px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
 .w-bottom { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
 .w-google { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 54px; border-radius: 999px; background: #fff;
   border: 1.5px solid #dadce0; font-size: 16px; font-weight: 700; color: #1f1f1f; box-shadow: 0 1px 3px rgba(15,39,64,.08); }
