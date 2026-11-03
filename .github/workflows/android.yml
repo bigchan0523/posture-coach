@@ -35,8 +35,8 @@ jobs:
       - name: 구글 로그인 플러그인 (firebase/google-services.json 이 있을 때만)
         run: |
           if [ -f firebase/google-services.json ]; then
-            npm install --no-save --no-audit --no-fund @capacitor-firebase/authentication@6.3.1 @capacitor-firebase/firestore@6.3.1 firebase@10
-            echo "Firebase 켬"
+            npm install --no-audit --no-fund @capacitor-firebase/authentication@6.3.1 @capacitor-firebase/firestore@6.3.1 firebase@10
+            echo "Firebase 켬 (Capacitor는 package.json에 적힌 플러그인만 찾아서 빌드 중에만 추가)"
           else
             echo "firebase/google-services.json 없음 → 계정 기능 없이 빌드"
           fi
