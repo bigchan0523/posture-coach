@@ -6,6 +6,7 @@ import { store } from "./store.js";
 import { sfx, say } from "./sound.js";
 import { VIEW_TEXT } from "./routines.js";
 import { rig, fuse, TRACKER_EXERCISES } from "./trackers.js";
+import { Skeleton3D } from "./skeleton3d.js";
 
 const DEMO = new URLSearchParams(location.search).has("demo");
 const $ = (id) => document.getElementById(id);
@@ -518,6 +519,24 @@ class Session {
 
   draw(lms, W, H, r) {
     const c = this.el.canvas;
+    if (this.mode() === "trackers") {
+      // 트래커만 쓸 때는 3D 뼈대 (드래그로 돌려보기). 운동마다 보기 좋은 방향으로 시작
+      this.v3d ??= new Skeleton3D(c, { dark: true });
+      if (this.v3dEx !== this.item.ex) {
+        this.v3dEx = this.item.ex;
+        this.v3d.reset(this.def.view === "front" ? "free" : "free");
+        if (this.def.view !== "front") { this.v3d.yaw = 70; this.v3d.pitch = 10; }
+      }
+      const a = rig.jointAngles();
+      const f = (v) => `${Math.round(v)}°`;
+      this.v3d.render(rig.skeleton(), {
+        forward: rig.viewForward,
+        alert: r?.feedback?.some((x) => x.severity === "warning" || x.severity === "error"),
+        empty: "트래커 신호를 기다리는 중",
+        labels: a ? [{ at: "left_knee", text: f(a.leftKnee) }, { at: "right_knee", text: f(a.rightKnee) }] : [],
+      });
+      return;
+    }
     const dpr = window.devicePixelRatio || 1;
     if (c.width !== Math.round(c.clientWidth * dpr)) { c.width = Math.round(c.clientWidth * dpr); c.height = Math.round(c.clientHeight * dpr); }
     const alert = r?.feedback?.some((f) => f.severity === "warning" || f.severity === "error");

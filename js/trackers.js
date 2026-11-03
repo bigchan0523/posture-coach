@@ -365,12 +365,13 @@ class TrackerRig {
     // 바닥 맞추기: 가장 낮은 점이 y=0 (트래커만으로는 높이를 알 수 없어서 SlimeVR처럼 '발은 바닥에' 가정)
     const floor = Math.min(...Object.values(pts).map((p) => p[1]));
     for (const k in pts) pts[k] = [pts[k][0], pts[k][1] - floor, pts[k][2]];
+    const waistF = [waist[0], waist[1] - floor, waist[2]];
     // 몸 기준 방향 (화면 투영용): 골반 앞쪽을 수평으로. 누워 있을 땐 몸통 방향을 앞쪽으로
     let fwdH = [fH[0], 0, fH[2]];
     if (Math.hypot(fwdH[0], fwdH[2]) < 0.3) fwdH = [uH[0], 0, uH[2]];
     fwdH = norm(fwdH);
     const leftH = norm(cross(UP, fwdH));
-    return { pts, fwdH, leftH, lH, uH };
+    return { pts, waist: waistF, fwdH, leftH, lH, uH };
   }
 
   /** 카메라 대신 쓸 '옆(또는 정면)에서 찍은 것 같은' 33개 관절 + 3D로만 알 수 있는 값 */
@@ -431,6 +432,9 @@ class TrackerRig {
       trunk: this.derived(sk).trunk_lean_3d,
     };
   }
+
+  /** 3D 보기 기준 방향: 보정할 때 몸이 바라본 방향 (월드) */
+  get viewForward() { return this.calib?.fwd?.hip || null; }
 
   setDemoScene(s) { this.source?.setScene?.(s); }
 }

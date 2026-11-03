@@ -2,6 +2,7 @@
 import { rig, PARTS, TRACKER_EXERCISES } from "./trackers.js";
 import { store } from "./store.js";
 import { say, sfx } from "./sound.js";
+import { Skeleton3D } from "./skeleton3d.js";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const SOURCES = [
@@ -62,10 +63,11 @@ export function trackersScreen(backBar) {
   </section>
 
   <section class="block">
-    <h3>뼈대 미리보기</h3>
-    <div class="trk-preview">
-      <figure><canvas id="trkSide" width="300" height="360"></canvas><figcaption>옆에서</figcaption></figure>
-      <figure><canvas id="trkFront" width="300" height="360"></canvas><figcaption>정면에서</figcaption></figure>
+    <h3>3D 뼈대</h3>
+    <div class="trk-3d">
+      <canvas id="trk3d" aria-label="3D 뼈대. 드래그해서 돌려볼 수 있어요"></canvas>
+      <div class="trk-views">${[["free", "자유"], ["front", "정면"], ["side", "옆"], ["top", "위"]].map(([v, l]) => `<button data-act="trk-view" data-val="${v}">${l}</button>`).join("")}</div>
+      <p class="trk-3d-hint">드래그로 돌리기 · 두 손가락으로 확대 · 두 번 탭하면 처음으로</p>
     </div>
     <div id="trkAngles" class="trk-angles"></div>
     <p class="muted small">트래커로 할 수 있는 운동: 스쿼트, 런지, 사이드 런지, 데드리프트, 글루트 브릿지, 월싯, 하이니즈, 마운틴 클라이머, 레그 레이즈 (${TRACKER_EXERCISES.length}가지)</p>
@@ -187,6 +189,7 @@ export function onTrackerAct(act, b, rerender) {
       update();
       return true;
     }
+    case "trk-view": viewer?.setView(b.dataset.val); return true;
     case "trk-unassign": rig.setAssign(b.dataset.part, null); update(); return true;
     case "trk-cal1":
       ui.msg = "";
@@ -208,47 +211,22 @@ export function onTrackerAct(act, b, rerender) {
   return false;
 }
 
-// ---------- 미리보기 ----------
-const BONES = [[11, 12], [11, 23], [12, 24], [23, 24], [23, 25], [25, 27], [27, 29], [27, 31], [24, 26], [26, 28], [28, 30], [28, 32], [7, 8], [0, 7], [0, 8]];
+// ---------- 3D 미리보기 ----------
+let viewer = null;
 function preview() {
-  for (const [id, view] of [["trkSide", "side"], ["trkFront", "front"]]) {
-    const c = document.getElementById(id);
-    if (!c) continue;
-    const ctx = c.getContext("2d");
-    ctx.clearRect(0, 0, c.width, c.height);
-    const t = rig.landmarks(view, { W: 720, H: 1280 });
-    if (!t) {
-      ctx.fillStyle = "#8aa0b4";
-      ctx.font = "600 22px Pretendard, system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(rig.calib?.done ? "골반 트래커 연결 안 됨" : "보정하면 보여요", c.width / 2, c.height / 2);
-      continue;
-    }
-    // 화면에 꽉 차게
-    const pts = t.lm.map((l) => [l.x * 720, l.y * 1280]);
-    const used = [0, 7, 8, 11, 12, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32];
-    const xs = used.map((i) => pts[i][0]), ys = used.map((i) => pts[i][1]);
-    const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
-    const k = Math.min((c.width - 50) / Math.max(w, 1), (c.height - 80) / Math.max(h, 1), 0.6); // 머리 그릴 자리 남김
-    const ox = c.width / 2 - ((Math.max(...xs) + Math.min(...xs)) / 2) * k, oy = c.height - 20 - Math.max(...ys) * k;
-    const P = (i) => [ox + pts[i][0] * k, oy + pts[i][1] * k];
-    ctx.strokeStyle = "#dbe7f1"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(10, oy + Math.max(...ys) * k + 2); ctx.lineTo(c.width - 10, oy + Math.max(...ys) * k + 2); ctx.stroke();
-    ctx.lineCap = "round";
-    ctx.lineWidth = 9;
-    ctx.strokeStyle = "#1e9be8";
-    for (const [a, b] of BONES) { ctx.beginPath(); ctx.moveTo(...P(a)); ctx.lineTo(...P(b)); ctx.stroke(); }
-    ctx.fillStyle = "#0f2740";
-    const [hx, hy] = P(0), [ex, ey] = P(7);
-    ctx.beginPath(); ctx.arc((hx + ex) / 2, (hy + ey) / 2 - 6, 15, 0, Math.PI * 2); ctx.fill();
-    for (const i of [11, 12, 23, 24, 25, 26, 27, 28]) { const [x, y] = P(i); ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = "#0f2740"; ctx.stroke(); }
-    ctx.lineWidth = 9; ctx.strokeStyle = "#1e9be8";
-  }
+  const c = document.getElementById("trk3d");
+  if (!c) return;
+  if (!viewer || viewer.c !== c) viewer = new Skeleton3D(c, { dark: true });
   const a = rig.jointAngles();
+  const f = (v) => (v == null ? "-" : `${Math.round(v)}°`);
+  viewer.render(rig.skeleton(), {
+    forward: rig.viewForward,
+    empty: rig.calib?.done ? "골반 트래커가 연결 안 됐어요" : "보정하면 여기에 뼈대가 보여요",
+    labels: a ? [{ at: "left_knee", text: f(a.leftKnee) }, { at: "right_knee", text: f(a.rightKnee) }] : [],
+  });
   const el = document.getElementById("trkAngles");
   if (el) {
-    const f = (v) => (v == null ? "-" : `${Math.round(v)}°`);
-    const html = a ? `<span>무릎 <b>${f(a.leftKnee)}</b> / <b>${f(a.rightKnee)}</b></span><span>엉덩이 <b>${f(a.leftHip)}</b> / <b>${f(a.rightHip)}</b></span><span>상체 숙임 <b>${f(a.trunk)}</b></span>` : "";
+    const html = a ? `<span>무릎 왼 <b>${f(a.leftKnee)}</b> 오 <b>${f(a.rightKnee)}</b></span><span>엉덩이 왼 <b>${f(a.leftHip)}</b> 오 <b>${f(a.rightHip)}</b></span><span>상체 숙임 <b>${f(a.trunk)}</b></span>` : "";
     if (el.innerHTML !== html) el.innerHTML = html;
   }
 }

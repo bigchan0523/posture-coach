@@ -389,3 +389,10 @@ body.in-session .tabbar { display: none; }
 .trk-angles { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 6px; font-size: 14px; color: var(--muted); }
 .trk-angles b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .trk-diag { margin-top: 8px; line-height: 1.6; word-break: break-all; }
+.trk-3d { position: relative; margin-top: 8px; border-radius: var(--radius-l); overflow: hidden; background: #0b1d30; }
+.trk-3d canvas { display: block; width: 100%; height: 420px; cursor: grab; }
+.trk-3d canvas:active { cursor: grabbing; }
+.trk-views { position: absolute; top: 10px; right: 10px; display: flex; gap: 4px; background: rgba(255,255,255,.1); border-radius: 999px; padding: 3px; }
+.trk-views button { color: #fff; font-size: 13px; font-weight: 700; padding: 6px 10px; border-radius: 999px; }
+.trk-views button:active { background: rgba(255,255,255,.2); }
+.trk-3d-hint { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; color: rgba(255,255,255,.55); font-size: 12px; margin: 0; pointer-events: none; }
