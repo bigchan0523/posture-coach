@@ -464,13 +464,17 @@ class TrackerRig {
       const la = this.dir(`${side}_lower_arm`) || (R(`${side}_upper_arm`) ? ua : mul(top.up, -1));
       const wr = add(el, mul(la, BONE.lowerArm));
       const hn = this.dir(`${side}_hand`) || la;
-      return { sh, el, wr, hand: add(wr, mul(hn, BONE.hand)) };
+      // 손: SlimeVR처럼 손목에서 살짝 앞으로 굽은 모양 (handDistanceY/Z) + 손가락 끝
+      const fwdArm = norm(sub(top.f, mul(hn, dot(top.f, hn))));
+      const hand = R(`${side}_hand`) ? add(wr, mul(hn, BONE.hand)) : add(wr, add(mul(hn, 0.05), mul(fwdArm, 0.04)));
+      const finger = add(hand, add(mul(hn, 0.03), mul(fwdArm, 0.035)));
+      return { sh, el, wr, hand, finger };
     };
     const aL = arm("l", 1), aR = arm("r", -1);
     const pts = {
       nose, left_ear: add(headC, mul(lHd, 0.07)), right_ear: add(headC, mul(lHd, -0.07)),
       left_shoulder: aL.sh, right_shoulder: aR.sh, left_elbow: aL.el, right_elbow: aR.el, left_wrist: aL.wr, right_wrist: aR.wr,
-      left_hand: aL.hand, right_hand: aR.hand,
+      left_hand: aL.hand, right_hand: aR.hand, left_finger: aL.finger, right_finger: aR.finger,
       left_hip: hipL, right_hip: hipR, left_knee: L.knee, right_knee: Rr.knee, left_ankle: L.ankle, right_ankle: Rr.ankle,
       left_heel: L.heel, right_heel: Rr.heel, left_foot_index: L.toe, right_foot_index: Rr.toe,
     };

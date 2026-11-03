@@ -16,7 +16,7 @@ const rad = (d) => (d * Math.PI) / 180;
 // 뼈 색: SlimeVR 서버 GUI(utils/skeletonHelper.ts, MIT/Apache-2.0)의 boneColor 그대로
 const C = {
   hipSeg: "red", chest: "purple", upperChest: "chartreuse", neck: "chartreuse", shoulder: "#00ffff", hip: "pink",
-  thigh: "chartreuse", shin: "teal", foot: "gold", upperArm: "indianred", lowerArm: "red", hand: "fuchsia",
+  thigh: "chartreuse", shin: "teal", foot: "gold", upperArm: "indianred", lowerArm: "red", hand: "fuchsia", finger: "pink",
 };
 // [시작, 끝, 색, 트래커가 있어야 그리는 관절(없으면 안 그림)]
 const BONES = [
@@ -25,10 +25,11 @@ const BONES = [
   ["left_shoulder", "left_elbow", C.upperArm, "left_elbow"], ["right_shoulder", "right_elbow", C.upperArm, "right_elbow"],
   ["left_elbow", "left_wrist", C.lowerArm, "left_wrist"], ["right_elbow", "right_wrist", C.lowerArm, "right_wrist"],
   ["left_wrist", "left_hand", C.hand, "left_hand"], ["right_wrist", "right_hand", C.hand, "right_hand"],
+  ["left_hand", "left_finger", C.finger, "left_hand"], ["right_hand", "right_finger", C.finger, "right_hand"],
   ["left_hip", "right_hip", C.hip],
   ["left_hip", "left_knee", C.thigh], ["right_hip", "right_knee", C.thigh],
   ["left_knee", "left_ankle", C.shin], ["right_knee", "right_ankle", C.shin],
-  ["left_heel", "left_foot_index", C.foot], ["right_heel", "right_foot_index", C.foot],
+  ["left_ankle", "left_foot_index", C.foot], ["right_ankle", "right_foot_index", C.foot], // 발: 발목 → 발끝 (다리와 이어지게)
 ];
 const JOINTS = ["left_hip", "right_hip", "left_knee", "right_knee", "left_ankle", "right_ankle", "left_shoulder", "right_shoulder", "waist", "left_elbow", "right_elbow", "left_wrist", "right_wrist"];
 
@@ -170,9 +171,9 @@ export class Skeleton3D {
       const A = pp[a], B = pp[b];
       if (!A || !B) continue;
       const faint = need && !tracked[need];
-      if (faint && !opts.showUntracked) continue; // 트래커 없는 팔·손은 안 그림
+      // SlimeVR처럼 트래커 없는 팔·손도 몸통을 따라 늘어뜨려 그림 (판정에는 안 씀)
       items.push({ z: (A.z + B.z) / 2, draw: () => {
-        ctx.globalAlpha = faint ? 0.25 : 1;
+        ctx.globalAlpha = 1;
         ctx.strokeStyle = opts.alert && !need ? "#ff5a5f" : col;
         ctx.lineWidth = 3.5 * dpr; // SlimeVR처럼 굵기 일정한 얇은 선
         ctx.lineCap = "round";
