@@ -14,15 +14,19 @@ const norm = (a) => { const n = Math.hypot(...a) || 1; return mul(a, 1 / n); };
 const rad = (d) => (d * Math.PI) / 180;
 
 // 뼈 색 (SlimeVR 화면과 비슷하게: 몸통 빨강, 허벅지 연두, 정강이 청록, 어깨·골반 분홍)
-const C = { spine: "#ff4d5e", chest: "#c03adf", shoulder: "#34e0f0", hip: "#ff9ec4", thigh: "#b4f22e", shin: "#14a6b4", foot: "#ffd23f", head: "#34e0f0" };
+const C = { spine: "#ff4d5e", chest: "#c03adf", shoulder: "#34e0f0", hip: "#ff9ec4", thigh: "#b4f22e", shin: "#14a6b4", foot: "#ffd23f", head: "#34e0f0", upperArm: "#ff8a3d", lowerArm: "#ffc23d", hand: "#ff6fb5" };
+// [시작, 끝, 색, 트래커가 있어야 그리는 관절(없으면 흐리게)]
 const BONES = [
-  ["mid_hip", "waist", C.spine], ["waist", "mid_sh", C.chest], ["mid_sh", "neck_top", C.head],
+  ["mid_hip", "waist", C.spine], ["waist", "chest", C.spine], ["chest", "mid_sh", C.chest], ["mid_sh", "neck_top", C.head],
+  ["left_shoulder", "left_elbow", C.upperArm, "left_elbow"], ["right_shoulder", "right_elbow", C.upperArm, "right_elbow"],
+  ["left_elbow", "left_wrist", C.lowerArm, "left_wrist"], ["right_elbow", "right_wrist", C.lowerArm, "right_wrist"],
+  ["left_wrist", "left_hand", C.hand, "left_hand"], ["right_wrist", "right_hand", C.hand, "right_hand"],
   ["left_shoulder", "right_shoulder", C.shoulder], ["left_hip", "right_hip", C.hip],
   ["left_hip", "left_knee", C.thigh], ["right_hip", "right_knee", C.thigh],
   ["left_knee", "left_ankle", C.shin], ["right_knee", "right_ankle", C.shin],
   ["left_heel", "left_foot_index", C.foot], ["right_heel", "right_foot_index", C.foot],
 ];
-const JOINTS = ["left_hip", "right_hip", "left_knee", "right_knee", "left_ankle", "right_ankle", "left_shoulder", "right_shoulder", "waist"];
+const JOINTS = ["left_hip", "right_hip", "left_knee", "right_knee", "left_ankle", "right_ankle", "left_shoulder", "right_shoulder", "waist", "left_elbow", "right_elbow", "left_wrist", "right_wrist"];
 
 export const VIEWS = {
   free: { yaw: 35, pitch: 14 },
@@ -142,9 +146,11 @@ export class Skeleton3D {
     const mid = (a, b) => mul(add(P[a], P[b]), 0.5);
     P.mid_hip = mid("left_hip", "right_hip");
     P.mid_sh = mid("left_shoulder", "right_shoulder");
-    P.waist = sk.waist || add(P.mid_hip, mul(sub(P.mid_sh, P.mid_hip), 0.47));
+    P.waist = sk.waist || add(P.mid_hip, mul(sub(P.mid_sh, P.mid_hip), 0.35));
+    P.chest = sk.chest || add(P.mid_hip, mul(sub(P.mid_sh, P.mid_hip), 0.67));
     const ear = mid("left_ear", "right_ear");
-    P.neck_top = add(P.mid_sh, mul(sub(ear, P.mid_sh), 0.55));
+    P.neck_top = sk.neck_top || add(P.mid_sh, mul(sub(ear, P.mid_sh), 0.55));
+    const tracked = sk.tracked || {};
     const pp = Object.fromEntries(Object.entries(P).map(([k, v]) => [k, proj(v)]));
 
     // 바닥 그림자
@@ -156,25 +162,29 @@ export class Skeleton3D {
 
     // 먼 것부터 (화가 알고리즘)
     const items = [];
-    for (const [a, b, col] of BONES) {
+    for (const [a, b, col, need] of BONES) {
       const A = pp[a], B = pp[b];
       if (!A || !B) continue;
+      const faint = need && !tracked[need];
+      if (faint && !opts.showUntracked) continue; // 트래커 없는 팔·손은 안 그림
       items.push({ z: (A.z + B.z) / 2, draw: () => {
-        ctx.strokeStyle = opts.alert && /thigh|shin/.test(boneKind(a, b)) ? "#ff5a5f" : col;
+        ctx.globalAlpha = faint ? 0.25 : 1;
+        ctx.strokeStyle = opts.alert && !need ? "#ff5a5f" : col;
         ctx.lineWidth = Math.max(3, (0.055 * focal) / ((A.z + B.z) / 2));
         ctx.lineCap = "round";
         ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+        ctx.globalAlpha = 1;
       } });
     }
     for (const j of JOINTS) {
       const A = pp[j];
-      if (!A) continue;
+      if (!A || (/elbow|wrist/.test(j) && !tracked[j])) continue;
       items.push({ z: A.z - 0.01, draw: () => {
         const rr = Math.max(2.5, (0.028 * focal) / A.z);
         ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(A.x, A.y, rr, 0, Math.PI * 2); ctx.fill();
       } });
     }
-    const hp = proj(add(P.neck_top, mul(norm(sub(P.neck_top, P.mid_sh)), 0.11)));
+    const hp = proj(sk.head || add(P.neck_top, mul(norm(sub(P.neck_top, P.mid_sh)), 0.11)));
     if (hp) items.push({ z: hp.z, draw: () => {
       ctx.fillStyle = this.dark ? "#e8f4ff" : "#0f2740";
       ctx.beginPath(); ctx.arc(hp.x, hp.y, (0.1 * focal) / hp.z, 0, Math.PI * 2); ctx.fill();
@@ -202,7 +212,6 @@ export class Skeleton3D {
   }
 }
 
-const boneKind = (a, b) => (/knee/.test(a) && /hip/.test(a + b) ? "thigh" : /hip_|_hip/.test(a) && /knee/.test(b) ? "thigh" : /knee/.test(a) && /ankle/.test(b) ? "shin" : "");
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();

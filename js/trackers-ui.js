@@ -1,5 +1,6 @@
 // 모션 트래커 화면: 측정 방법 고르기 · 연결 상태 · 부위 지정(흔들어서 찾기) · 보정 · 뼈대 미리보기
-import { rig, PARTS, TRACKER_EXERCISES } from "./trackers.js";
+import { rig, PARTS, SETS } from "./trackers.js";
+import { Exercise } from "./engine.js";
 import { store } from "./store.js";
 import { say, sfx } from "./sound.js";
 import { Skeleton3D } from "./skeleton3d.js";
@@ -7,19 +8,24 @@ import { Skeleton3D } from "./skeleton3d.js";
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const SOURCES = [
   ["camera", "카메라", "폰 카메라로 관절을 인식해요. 18가지 운동 모두 가능"],
-  ["trackers", "트래커", "몸에 붙인 트래커 6개로만 측정해요. 폰은 아무 데나 둬도 되고, 하체 운동 9가지 가능 (나머지는 자동으로 카메라)"],
-  ["both", "둘 다", "카메라 화면에 트래커 뼈대를 맞춰 하체 각도를 더 정확하게. 카메라에서 가려져도 트래커로 계속 측정"],
+  ["trackers", "트래커", "몸에 붙인 트래커로만 측정해요. 폰은 아무 데나 둬도 돼요. 트래커가 없는 부위가 필요한 운동은 자동으로 카메라를 써요"],
+  ["both", "둘 다", "카메라 화면에 트래커 뼈대를 맞춰 더 정확하게. 카메라에서 가려져도 트래커로 계속 측정"],
 ];
 const shortId = (id) => (id || "").replace(/\/0$/, "").replace(/:/g, "").slice(-5);
 
 const ui = { finding: null, findSince: 0, findCand: null, cal: null, msg: "", msgBad: false };
 let mounted = null;
+// 운동 이름·필요 관절 (app.js가 운동 정의를 불러온 뒤 넣어줌) → 지금 트래커로 할 수 있는 운동 표시
+let exInfo = [];
+export function setTrackerExercises(defs) {
+  exInfo = Object.entries(defs).map(([id, d]) => ({ id, name: d.display_name, points: new Exercise(d).cfg.requiredPoints }));
+}
 
 export function trackerSummary() {
   const src = SOURCES.find(([v]) => v === (store.settings.source || "camera"));
   if (!rig.running) return { src: src[1], line: rig.assignedCount ? `트래커 ${rig.assignedCount}개 지정됨 · 눌러서 연결` : "와이파이 트래커 연결하기" };
   const st = rig.ready ? "보정 완료" : rig.calib ? "보정 중" : "보정 필요";
-  return { src: src[1], line: `트래커 ${rig.liveCount}/6 연결 · ${st}` };
+  return { src: src[1], line: `트래커 ${rig.liveCount}/${rig.set.n} 연결 · ${st}` };
 }
 
 export function trackersScreen(backBar) {
@@ -46,8 +52,16 @@ export function trackersScreen(backBar) {
   </section>
 
   <section class="block">
+    <h3>트래커 개수</h3>
+    <p class="muted">가지고 있는 트래커 수에 맞게 골라주세요</p>
+    <div class="trk-sets">${SETS.map((x) => `<button class="trk-set${x.id === rig.set.id ? " on" : ""}" data-act="trk-set" data-val="${x.id}">
+      <b>x${x.n}</b><span><strong>${x.name}</strong><small>${x.note}</small></span></button>`).join("")}</div>
+  </section>
+
+  <section class="block">
     <h3>부위 지정</h3>
-    <p class="muted">‘찾기’를 누르고 그 부위에 붙인 트래커를 흔들면 자동으로 지정돼요</p>
+    <p class="muted">몸 그림의 점이나 ‘찾기’를 누르고, 그 부위에 붙인 트래커를 흔들면 자동으로 지정돼요. 지정한 트래커를 흔들면 점이 반짝여요</p>
+    <div class="trk-body-wrap"><svg id="trkBody" class="trk-body" viewBox="0 0 200 384" role="img" aria-label="몸 그림, 트래커 위치"></svg></div>
     <div id="trkParts" class="list"></div>
     <div id="trkOthers"></div>
   </section>
@@ -70,7 +84,7 @@ export function trackersScreen(backBar) {
       <p class="trk-3d-hint">드래그로 돌리기 · 두 손가락으로 확대 · 두 번 탭하면 처음으로</p>
     </div>
     <div id="trkAngles" class="trk-angles"></div>
-    <p class="muted small">트래커로 할 수 있는 운동: 스쿼트, 런지, 사이드 런지, 데드리프트, 글루트 브릿지, 월싯, 하이니즈, 마운틴 클라이머, 레그 레이즈 (${TRACKER_EXERCISES.length}가지)</p>
+    <p id="trkExList" class="muted small"></p>
   </section>`;
 }
 
@@ -107,7 +121,10 @@ function update() {
     : `<div class="trk-status"><i></i><div><b>꺼져 있음</b>${rig.error ? `<span class="error">${esc(rig.error)}</span>` : `<span class="muted small">켜면 같은 와이파이의 트래커가 자동으로 연결돼요</span>`}</div>
         <button class="btn primary" data-act="trk-start">켜기</button></div>`) + diag;
 
-  $("trkParts").innerHTML = PARTS.map((p) => {
+  $("trkBody").innerHTML = bodySvg();
+  const can = exInfo.filter((e) => rig.supports(e.points, e.id));
+  $("trkExList").innerHTML = exInfo.length ? `지금 지정한 트래커로 할 수 있는 운동 (${can.length}/${exInfo.length}): ${can.map((e) => esc(e.name)).join(", ") || "없음"}` : "";
+  $("trkParts").innerHTML = rig.parts.map((p) => {
     const t = rig.tracker(p.id);
     const live = rig.live(p.id);
     const finding = ui.finding === p.id;
@@ -132,6 +149,24 @@ function update() {
   msg.textContent = calText;
   msg.className = `trk-msg${ui.msgBad ? " bad" : rig.ready && !ui.cal ? " good" : ""}`;
   document.querySelectorAll("[data-act=trk-cal1],[data-act=trk-cal2]").forEach((b) => { b.disabled = !!ui.cal || !rig.running; });
+}
+
+/** 몸 그림 + 부위 점 (정면에서 본 사람: 사람의 왼쪽이 화면 오른쪽) */
+function bodySvg() {
+  const line = (pts, w = 20) => `<polyline points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="#d7ecfb" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  let out = `<circle cx="100" cy="34" r="21" fill="#d7ecfb"/>`
+    + line([[100, 50], [100, 74]], 14)
+    + `<rect x="72" y="76" width="56" height="118" rx="22" fill="#d7ecfb"/>`
+    + line([[132, 86], [148, 140], [156, 196]], 16) + line([[68, 86], [52, 140], [44, 196]], 16)
+    + line([[112, 188], [118, 268], [120, 350], [128, 366]], 22) + line([[88, 188], [82, 268], [80, 350], [72, 366]], 22);
+  for (const p of rig.parts) {
+    const t = rig.tracker(p.id), live = rig.live(p.id);
+    const moving = live && live.motion > 60;
+    const cls = ui.finding === p.id ? "find" : live ? "on" : t ? "off" : "";
+    out += `<g class="trk-pt ${cls}${moving ? " moving" : ""}" data-act="trk-find" data-part="${p.id}" role="button" aria-label="${p.name} ${t ? "지정됨" : "지정 안 됨"}">
+      <circle cx="${p.x}" cy="${p.y}" r="16" class="hit"/><circle cx="${p.x}" cy="${p.y}" r="8.5" class="dot"/></g>`;
+  }
+  return out;
 }
 
 const batt = (t) => (t.battery < 0 ? "-" : `${Math.round(t.battery * 100)}%`);
@@ -190,6 +225,7 @@ export function onTrackerAct(act, b, rerender) {
       return true;
     }
     case "trk-view": viewer?.setView(b.dataset.val); return true;
+    case "trk-set": rig.setSet(b.dataset.val); rerender(); return true;
     case "trk-unassign": rig.setAssign(b.dataset.part, null); update(); return true;
     case "trk-cal1":
       ui.msg = "";

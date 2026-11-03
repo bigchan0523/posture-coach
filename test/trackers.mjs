@@ -6,7 +6,8 @@ import { dirname, join } from "node:path";
 import yaml from "../js/vendor/js-yaml.mjs";
 import { Exercise } from "../js/engine.js";
 import * as sim from "./sim.mjs";
-import { rig, PARTS, demoRigConfig, demoTrackerState, demoDirections, TRACKER_EXERCISES } from "../js/trackers.js";
+import { rig, PARTS, demoRigConfig, demoTrackerState, demoDirections } from "../js/trackers.js";
+import { store } from "../js/store.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const load = (name) => new Exercise(yaml.load(readFileSync(join(root, "exercises", `${name}.yaml`), "utf8")));
@@ -14,11 +15,12 @@ const load = (name) => new Exercise(yaml.load(readFileSync(join(root, "exercises
 export function runTrackerTests(check) {
   const cfg = demoRigConfig();
   const feed = (scene, t) => rig.onState(demoTrackerState(sim, scene, t, cfg));
+  rig.setSet("all");
   for (const p of PARTS) rig.setAssign(p.id, cfg.ids[p.id]);
 
   console.log("트래커 보정");
   feed("stand", 0); feed("stand", 0.02);
-  check("부위 6개 지정·연결", rig.liveCount === 6);
+  check("부위 20개 지정·연결", rig.liveCount === 20, rig.liveCount);
   check("서기 보정", rig.calibrateStand().ok);
   feed("calib", 0.1);
   check("앉는 정도가 부족하면 다시 요청", !rig.calibrateForward().ok);
@@ -47,25 +49,48 @@ export function runTrackerTests(check) {
   delete cfg.drift.l_thigh;
   feed("stand", 0); feed("stand", 0.02); rig.calibrateStand();
 
-  console.log("트래커로 운동 판정 (카메라 없이)");
+  console.log("트래커로 운동 판정 (카메라 없이, 트래커 20개)");
   // 6번 중 3번째마다 일부러 덜 움직임 → 4회. 좌우 번갈아 하는 운동은 한쪽 기준 2회
-  const expect = { squat: 4, lunge: 4, deadlift: 4, side_lunge: 4, high_knees: 2, glute_bridge: 4, leg_raise: 4, mountain_climber: 2 };
-  for (const name of TRACKER_EXERCISES) {
+  const expect = { high_knees: 2, mountain_climber: 2 };
+  const manifest = JSON.parse(readFileSync(join(root, "exercises", "manifest.json"), "utf8"));
+  for (const name of manifest) {
     const ex = load(name);
+    check(`${name}: 트래커로 가능`, rig.supports(ex.cfg.requiredPoints, name));
     const view = ex.cfg.view === "front" ? "front" : "side";
-    const faults = new Set();
     let last;
     for (let t = 0; t < 1 + 2.6 * 6; t += 1 / 30) {
       feed(name, t);
       const r = rig.landmarks(view);
       last = ex.update(r.lm, t * 1000, r.W, r.H, { allViews: true, derived: r.derived });
-      for (const f of last.feedback) faults.add(f.name);
     }
-    if (name === "wall_sit") { check(`월싯: 버틴 시간 측정 (${last.holdSec?.toFixed(1)}초)`, (last.holdSec || 0) > 5); continue; }
+    if (ex.cfg.type === "duration") { check(`${name}: 버틴 시간 측정 (${last.holdSec?.toFixed(1)}초)`, (last.holdSec || 0) > 5); continue; }
     const n = ex.cfg.bilateral ? Math.max(ex.channels[0].counter, ex.channels[1].counter) : ex.counter;
-    const want = expect[name];
-    // 좌우 번갈아 하는 운동은 한쪽 기준
-    check(`${name}: ${n}회 (기대 ${want})`, n === want, [...faults].join(","));
+    const want = expect[name] ?? 4;
+    check(`${name}: ${n}회 (기대 ${want})`, n === want);
+  }
+
+  console.log("트래커 개수 세트별로 할 수 있는 운동");
+  {
+    const assignOnly = (ids) => { store.setSetting("trackerAssign", Object.fromEntries(ids.map((p) => [p, cfg.ids[p]]))); };
+    const can = () => manifest.filter((n) => rig.supports(load(n).cfg.requiredPoints, n));
+    assignOnly(["chest", "l_thigh", "r_thigh", "l_shin", "r_shin"]);
+    const five = can();
+    check(`x5: 하체 운동만 (${five.length}개)`, five.includes("squat") && !five.includes("bicep_curl") && !five.includes("calf_raise"), five.join(","));
+    assignOnly(["chest", "hip", "l_thigh", "r_thigh", "l_shin", "r_shin", "l_foot", "r_foot"]);
+    check("x8: 발 트래커로 카프 레이즈 가능", can().includes("calf_raise"));
+    assignOnly(["chest", "hip", "l_thigh", "r_thigh", "l_shin", "r_shin", "l_foot", "r_foot", "l_upper_arm", "r_upper_arm"]);
+    check("x10: 위팔만으론 팔꿈치 각도 운동 불가", !can().includes("bicep_curl"));
+    assignOnly(["chest", "hip", "l_thigh", "r_thigh", "l_shin", "r_shin", "l_foot", "r_foot", "l_upper_arm", "r_upper_arm", "l_lower_arm", "r_lower_arm"]);
+    check(`x12: 18가지 전부 가능 (${can().length})`, can().length === manifest.length);
+    for (const p of PARTS) rig.setAssign(p.id, cfg.ids[p.id]);
+    feed("stand", 0); rig.calibrateStand(); feed("calib", 1); rig.calibrateForward();
+  }
+
+  console.log("팔 트래커 각도");
+  {
+    feed("bicep_curl", 1 + 1.3); // 팔꿈치 150° 굽힘 → 사이 각도 30°
+    const a = rig.jointAngles();
+    check("팔꿈치 각도 ≈ 30°", Math.abs(a.leftElbow - 30) < 4, a.leftElbow?.toFixed(1));
   }
 
   console.log("트래커 무릎 모임 감지 (3D)");

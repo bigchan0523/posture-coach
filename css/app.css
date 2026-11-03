@@ -396,3 +396,20 @@ body.in-session .tabbar { display: none; }
 .trk-views button { color: #fff; font-size: 13px; font-weight: 700; padding: 6px 10px; border-radius: 999px; }
 .trk-views button:active { background: rgba(255,255,255,.2); }
 .trk-3d-hint { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; color: rgba(255,255,255,.55); font-size: 12px; margin: 0; pointer-events: none; }
+.trk-sets { display: grid; gap: 8px; margin-top: 10px; }
+.trk-set { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: var(--radius-m); background: var(--surface); text-align: left; border: 2px solid transparent; }
+.trk-set b { font-size: 26px; font-weight: 900; color: var(--sky-deep); min-width: 52px; letter-spacing: -0.02em; }
+.trk-set span { display: flex; flex-direction: column; gap: 2px; }
+.trk-set strong { font-size: 15px; }
+.trk-set small { color: var(--muted); font-size: 13px; }
+.trk-set.on { border-color: var(--sky); background: #e9f6ff; }
+.trk-body-wrap { display: flex; justify-content: center; margin: 12px 0 4px; }
+.trk-body { width: 210px; height: auto; stroke: none; fill: none; }
+.trk-pt { cursor: pointer; }
+.trk-pt .hit { fill: transparent; }
+.trk-pt .dot { fill: #fff; stroke: #9fb4c6; stroke-width: 2.5; transition: r .15s; }
+.trk-pt.on .dot { fill: var(--good); stroke: #fff; }
+.trk-pt.off .dot { fill: var(--warn); stroke: #fff; }
+.trk-pt.find .dot { fill: var(--sky); stroke: #fff; animation: trkBlink .7s ease-in-out infinite alternate; }
+.trk-pt.moving .dot { r: 12; stroke: var(--sky); stroke-width: 4; }
+@keyframes trkBlink { to { opacity: .35; } }

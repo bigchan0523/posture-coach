@@ -6,7 +6,7 @@ import { AREAS, areaOf, PRESETS, LEVELS, VIEW_TEXT, scaled, estimateMinutes, tot
 import { weekdayBars, trendLine, monthCalendar, rings, dayFractions, RING_COLORS } from "./charts.js";
 import { sfx } from "./sound.js";
 import { PICTOS } from "./pictos.js";
-import { trackersScreen, mountTrackers, unmountTrackers, onTrackerAct, trackerSummary } from "./trackers-ui.js";
+import { trackersScreen, mountTrackers, unmountTrackers, onTrackerAct, trackerSummary, setTrackerExercises } from "./trackers-ui.js";
 
 const defs = {};
 let names = [];
@@ -44,6 +44,7 @@ const mark = (ex) => `<span class="mark a-${areaOf(ex)}" aria-hidden="true">${PI
 async function loadDefs() {
   names = await (await fetch("exercises/manifest.json")).json();
   await Promise.all(names.map(async (n) => { defs[n] = yaml.load(await (await fetch(`exercises/${n}.yaml`)).text()); }));
+  setTrackerExercises(defs);
 }
 
 function routineById(id) {
@@ -88,7 +89,7 @@ function homeScreen() {
 
   return `
   <header class="home-head">
-    <h1 class="brand">자세 코치</h1>
+    <h1 class="brand">자코자코</h1>
     <div class="bar-right">
       <button class="streak${st ? " on" : ""}" data-act="open-calendar" aria-label="연속 ${st}일, 달력 보기">${ICON.flame}${st}일</button>
       <button class="icon-btn" data-act="settings" aria-label="설정">${ICON.gear}</button>

@@ -5,7 +5,7 @@ import { drawPose } from "./overlay.js";
 import { store } from "./store.js";
 import { sfx, say } from "./sound.js";
 import { VIEW_TEXT } from "./routines.js";
-import { rig, fuse, TRACKER_EXERCISES } from "./trackers.js";
+import { rig, fuse } from "./trackers.js";
 import { Skeleton3D } from "./skeleton3d.js";
 
 const DEMO = new URLSearchParams(location.search).has("demo");
@@ -69,8 +69,10 @@ class Session {
   get item() { return this.items[this.itemIdx]; }
   /** 이 운동을 무엇으로 측정할지: 트래커로 못 하는 운동(팔 동작 등)은 카메라로 */
   mode(ex = this.item.ex) {
-    if (this.source === "camera" || !TRACKER_EXERCISES.includes(ex)) return "camera";
-    return this.source;
+    if (this.source === "camera") return "camera";
+    this.pointsOf ??= {};
+    this.pointsOf[ex] ??= new Exercise(this.defs[ex]).cfg.requiredPoints;
+    return rig.supports(this.pointsOf[ex], ex) ? this.source : "camera";
   }
   get needCamera() { return this.items.some((it) => this.mode(it.ex) !== "trackers"); }
   get needTrackers() { return this.items.some((it) => this.mode(it.ex) !== "camera"); }
@@ -103,8 +105,8 @@ class Session {
       if (!rig.ready) {
         this.hideLoading(true);
         const why = rig.error ? rig.error
-          : rig.assignedCount < 5 ? "트래커 부위 지정이 아직 안 됐어요"
-          : rig.liveCount < 5 ? `트래커 ${rig.liveCount}개만 연결돼 있어요. 전원과 와이파이를 확인해주세요`
+          : rig.assignedCount < rig.set.n ? "트래커 부위 지정이 아직 안 됐어요"
+          : rig.liveCount < rig.assignedCount ? `트래커 ${rig.liveCount}/${rig.assignedCount}개만 연결돼 있어요. 전원과 와이파이를 확인해주세요`
           : "트래커 보정(똑바로 서기 → 살짝 앉기)을 먼저 해주세요";
         this.showPanel(`<h2 class="p-title">트래커 준비가 안 됐어요</h2><p class="p-lead">${esc(why)}</p>
           <div class="p-actions"><button class="btn" data-act="use-camera">카메라로 하기</button><button class="btn primary" data-act="tracker-setup">트래커 설정</button></div>`);
@@ -432,7 +434,7 @@ class Session {
     if (!rig.standingStill()) { this.stillSince = null; return; }
     this.stillSince ??= now;
     if (now - this.stillSince > 1000 && now - (this.lastRecal || 0) > 5000) {
-      rig.calibrateStand();
+      rig.calibrateStand({ only: rig.bodyParts });
       this.lastRecal = now;
     }
   }
@@ -533,7 +535,9 @@ class Session {
         forward: rig.viewForward,
         alert: r?.feedback?.some((x) => x.severity === "warning" || x.severity === "error"),
         empty: "트래커 신호를 기다리는 중",
-        labels: a ? [{ at: "left_knee", text: f(a.leftKnee) }, { at: "right_knee", text: f(a.rightKnee) }] : [],
+        labels: !a ? [] : a.leftElbow != null && this.pointsOf?.[this.item.ex]?.some((p) => /elbow|wrist/.test(p))
+          ? [{ at: "left_elbow", text: f(a.leftElbow) }, { at: "right_elbow", text: f(a.rightElbow) }]
+          : [{ at: "left_knee", text: f(a.leftKnee) }, { at: "right_knee", text: f(a.rightKnee) }],
       });
       return;
     }
