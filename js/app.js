@@ -91,15 +91,14 @@ function homeScreen() {
 
   return `
   <header class="home-head">
-    <h1 class="brand">자코자코</h1>
+    <img class="brand-logo" src="img/logo.svg" alt="자코자코">
+    <div class="hello"><span>${now.getMonth() + 1}월 ${now.getDate()}일 ${WEEK[now.getDay()]}요일</span><h1 data-act="edit-nick" role="button" aria-label="닉네임 바꾸기">${greeting()}</h1></div>
     <div class="bar-right">
-      <button class="streak${st ? " on" : ""}" data-act="open-calendar" aria-label="연속 ${st}일, 달력 보기">${ICON.flame}${st}일</button>
+      ${streakChip(st)}
       <button class="icon-btn" data-act="settings" aria-label="설정">${ICON.gear}</button>
     </div>
   </header>
-  <div class="date-row">${ui.weekOffset === 0
-    ? `<p class="date">${now.getMonth() + 1}월 ${now.getDate()}일 ${WEEK[now.getDay()]}요일</p>`
-    : `<p class="date">${week[0].getMonth() + 1}월 ${week[0].getDate()}일 ~ ${week[6].getMonth() + 1}월 ${week[6].getDate()}일</p><button class="text-btn" data-act="week-today">이번 주</button>`}</div>
+  ${ui.weekOffset === 0 ? "" : `<div class="date-row"><p class="date">${week[0].getMonth() + 1}월 ${week[0].getDate()}일 ~ ${week[6].getMonth() + 1}월 ${week[6].getDate()}일</p><button class="text-btn" data-act="week-today">이번 주</button></div>`}
   <div class="week-wrap" id="weekSwipe" aria-label="좌우로 밀어서 다른 주 보기"><div class="week ${anim}">${week.map((d) => {
     const done = days.has(dayKey(d));
     const today = dayKey(d) === dayKey(now);
@@ -136,6 +135,48 @@ function homeScreen() {
     <h3>최근 운동</h3>
     ${last ? recordRow(last) : `<p class="empty">아직 기록이 없어요. 오늘의 루틴으로 첫 운동을 시작해보세요.</p>`}
   </section>`;
+}
+
+// 인사: 닉네임(설정) → 구글 이름 → 없으면 인사만
+//  상황(오늘 운동 함 / 기록 끊김 / 연속 7일+)과 시간대에 따라 문구를 골라, 앱을 켤 때마다 바뀜
+const GREETS = {
+  done: ["오늘 운동 완료! 멋져요", "오늘도 해냈어요", "오늘 몫은 끝! 푹 쉬어요"],
+  ash: ["다시 불 붙여볼까요?", "오늘부터 다시 1일!", "잠깐 쉬었으니 다시 가볍게!"],
+  hot: ["벌써 연속 {n}일째!", "불꽃이 꺼지지 않게!", "연속 {n}일, 오늘도 이어가요"],
+  morning: ["좋은 아침이에요", "가볍게 몸 풀고 시작해요", "아침 운동, 하루가 달라져요"],
+  day: ["오늘도 가볍게!", "잠깐 스트레칭 어때요?", "오늘 운동, 10분이면 충분해요"],
+  evening: ["오늘 하루도 고생했어요", "하루 마무리 운동 한 판?", "저녁엔 가볍게 몸 풀어요"],
+  night: ["늦었어도 5분이면 충분해요", "자기 전 가볍게 스트레칭!", "오늘이 가기 전에 한 세트?"],
+};
+const greetSeed = Math.random();
+function greeting() {
+  const name = (store.settings.nickname || account.user?.displayName || "").trim();
+  const n = streak();
+  const doneToday = store.history.some((h) => dayKey(h.ts) === dayKey(new Date()));
+  const hr = new Date().getHours();
+  const key = doneToday ? "done" : n === 0 && store.history.length ? "ash" : n >= 7 ? "hot"
+    : hr >= 5 && hr < 11 ? "morning" : hr < 17 && hr >= 11 ? "day" : hr >= 17 && hr < 22 ? "evening" : "night";
+  const list = GREETS[key];
+  const msg = list[Math.floor(greetSeed * list.length)].replace("{n}", n);
+  return name ? `${esc(name)}님, ${msg}` : msg;
+}
+
+// 연속 기록 불꽃: 기록이 쌓일수록 불꽃반응 색으로 등급이 올라감
+// (리튬 빨강 → 칼슘 주황 → 나트륨 노랑 → 바륨 초록 → 구리 청록 → 칼륨 보라 → 스트론튬 분홍)
+const FLAME_TIERS = [
+  [100, "#ff2d9a", "#ffa3d6", "#e0207f"], [60, "#a64dff", "#e0a8ff", "#9035ef"], [30, "#10bfae", "#7ff0e0", "#0a9e90"],
+  [14, "#2fcf4a", "#a8f08a", "#1fae37"], [7, "#ffc800", "#fff07a", "#c99a00"], [3, "#ff8a00", "#ffc06b", "#f07800"], [1, "#ff3b30", "#ff8a65", "#ff3b30"],
+];
+// 연속 기록이 끊긴 날(기록은 있는데 0일): 잿더미 + 꺼져가는 불씨
+const ASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.2 9.2c-1-1.3-.5-2.8.6-3.6-.1 1.1.6 1.7 1.3 2" fill="none" stroke="#bdb6b0" stroke-width="1.3" stroke-linecap="round" opacity=".85"/><path d="M14.8 8.4c.8-1 .4-2.2-.4-2.8" fill="none" stroke="#cbc5c0" stroke-width="1.2" stroke-linecap="round" opacity=".6"/><path d="M6.2 16.2 15.6 11" stroke="#4a3f39" stroke-width="2" stroke-linecap="round"/><path d="M8.6 11.4l9.2 5.2" stroke="#5a4c44" stroke-width="2" stroke-linecap="round"/><path d="M2.8 20.2c.4-1.9 1.6-2.9 2.9-3.1.4-1.9 2-3.2 3.8-3 .8-1.4 2.2-2.1 3.6-1.8 1.5.3 2.4 1.4 2.6 2.7 1.7-.2 3.3.9 3.8 2.6 1.1.3 1.8 1.2 1.9 2.6z" fill="#8f8781"/><path d="M6 19.2c.6-1.3 1.8-2 3-1.9.6-1.1 1.7-1.6 2.9-1.4 1.2.2 2 1 2.2 2 1.2 0 2.3.6 2.8 1.6z" fill="#a8a09a"/><circle cx="9.4" cy="18.6" r=".95" fill="#ff6a2b"/><circle cx="14.6" cy="17.9" r=".75" fill="#ffa24d"/><circle cx="12.2" cy="19.4" r=".55" fill="#ff7a3a" opacity=".85"/><circle cx="16.8" cy="19.6" r=".45" fill="#ff8a3d" opacity=".7"/></svg>';
+function streakChip(n) {
+  if (n === 0 && store.history.length) return `<button class="streak" style="color:#6f6a66;background:#8a817a1f" data-act="open-calendar" aria-label="연속 기록이 끊겼어요, 달력 보기">${ASH}0일</button>`;
+  const t = FLAME_TIERS.find(([min]) => n >= min);
+  const [c1, c2, text] = t ? t.slice(1) : ["#b8c4cf", "#d5dde4", "#8a9aaa"];
+  const glow = n >= 14;
+  const id = `fl${n}`;
+  const svg = `<svg viewBox="0 0 24 24" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${c2}"/><stop offset="1" stop-color="${c1}"/></linearGradient></defs>${glow ? `<ellipse cx="12" cy="15" rx="8" ry="8" fill="${c1}" opacity=".18"/>` : ""}<path d="M12 2.5c1.2 3.6 5.6 6 5.6 11.2A5.6 5.6 0 0 1 6.4 13.7c0-2.7 1.4-4.3 2.6-5.4.3 1.8 1.3 2.9 2.4 3.1C11 8 10.9 5.1 12 2.5z" fill="url(#${id})"/><path d="M12 11.5c.6 1.6 2.4 2.6 2.4 4.6a2.4 2.4 0 0 1-4.8 0c0-1.2.7-2 1.3-2.5.1.8.5 1.2 1 1.3-.2-1.3-.3-2.4.1-3.4z" fill="#fff" opacity=".55"/></svg>`;
+  return `<button class="streak" style="color:${text};background:${c1}1f" data-act="open-calendar" aria-label="연속 ${n}일, 달력 보기">${svg}${n}일</button>`;
 }
 
 function recordRow(h) {
@@ -356,16 +397,44 @@ function openSettings() {
 
 // ----- 계정 -----
 const ago = (t) => { if (!t) return "아직 안 함"; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "방금" : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.round(m / 60)}시간 전` : `${Math.round(m / 1440)}일 전`; };
+// 닉네임 줄 (로그인 안 해도 바꿀 수 있음)
+const nickRow = () => `<button class="nick-row" data-act="edit-nick"><span><small>닉네임</small><b>${esc(store.settings.nickname || account.user?.displayName || "정하지 않음")}</b></span><em>바꾸기</em></button>`;
 function accountBlock() {
   const a = account, u = a.user;
   const err = a.error ? `<p class="error">${esc(a.error)}</p>` : "";
   if (!a.ready) return `<div class="acct"><p class="muted">계정 확인 중…</p></div>`;
-  if (!a.available) return `<div class="acct"><div class="acct-row">${ICON.user}<div><b>구글 계정</b><span class="muted small">로그인 준비 중이에요 (Firebase 설정 파일을 넣고 빌드하면 켜져요)</span></div></div></div>`;
+  if (!a.available) return `<div class="acct"><div class="acct-row">${ICON.user}<div><b>구글 계정</b><span class="muted small">로그인 준비 중이에요 (Firebase 설정 파일을 넣고 빌드하면 켜져요)</span></div></div>${nickRow()}</div>`;
   if (!u) return `<div class="acct"><div class="acct-row">${ICON.user}<div><b>구글 계정으로 로그인</b><span class="muted small">기록이 계정에 저장돼서 앱을 다시 깔거나 폰을 바꿔도 남아요</span></div></div>
-    <button class="btn primary wide" data-act="acct-in" ${a.status === "signing" ? "disabled" : ""}>${a.status === "signing" ? "로그인 중…" : "구글로 로그인"}</button>${err}</div>`;
+    ${nickRow()}<button class="btn primary wide" data-act="acct-in" ${a.status === "signing" ? "disabled" : ""}>${a.status === "signing" ? "로그인 중…" : "구글로 로그인"}</button>${err}</div>`;
   return `<div class="acct"><div class="acct-row">${u.photoUrl ? `<img src="${esc(u.photoUrl)}" alt="" referrerpolicy="no-referrer">` : ICON.user}<div><b>${esc(u.displayName || "내 계정")}</b><span class="muted small">${esc(u.email)}</span></div></div>
-    <p class="muted small">${a.status === "syncing" ? "동기화 중…" : `마지막 동기화 ${ago(store.sync.at)}`}${a.lastResult?.added ? ` · 계정에서 기록 ${a.lastResult.added}개 가져옴` : ""}</p>
+    ${nickRow()}
+    <p class="muted small">${a.status === "syncing" ? "동기화 중…" : `마지막 동기화 ${ago(store.sync.at)} · 5분마다 자동`}${a.lastResult?.added ? ` · 계정에서 기록 ${a.lastResult.added}개 가져옴` : ""}</p>
     <div class="row-inline"><button class="btn outline" data-act="acct-sync">지금 동기화</button><button class="btn outline" data-act="acct-out">로그아웃</button></div>${err}</div>`;
+}
+
+// ----- 닉네임 -----
+const NICK_MAX = 10;
+function openNickname() {
+  const sh = $sheet.querySelector(".sheet");
+  sh.dataset.kind = "nick";
+  sh.classList.remove("tall");
+  const cur = store.settings.nickname || account.user?.displayName || "";
+  sh.innerHTML = `
+    <div class="sheet-head"><h2>닉네임 바꾸기</h2><button class="text-btn" data-act="close-sheet">닫기</button></div>
+    <label class="nick-input"><input id="nickIn" maxlength="${NICK_MAX}" value="${esc(cur.slice(0, NICK_MAX))}" placeholder="예: 현준" autocomplete="off"><span id="nickCnt">${Math.min(cur.length, NICK_MAX)}/${NICK_MAX}</span></label>
+    <button class="btn primary wide" data-act="save-nick">저장</button>`;
+  $sheet.hidden = false;
+  const inp = document.getElementById("nickIn");
+  inp.addEventListener("input", () => { document.getElementById("nickCnt").textContent = `${inp.value.length}/${NICK_MAX}`; });
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") saveNickname(); });
+  setTimeout(() => { inp.focus(); inp.select(); }, 50);
+}
+function saveNickname(value = document.getElementById("nickIn")?.value) {
+  const v = String(value ?? "").trim().slice(0, NICK_MAX);
+  store.setSetting("nickname", v);
+  $sheet.hidden = true;
+  render();
+  toast(v ? `${v}님으로 부를게요` : "닉네임을 지웠어요");
 }
 
 function toast(text) {
@@ -406,6 +475,7 @@ $view.addEventListener("click", (e) => {
   switch (act) {
     case "back": return pop();
     case "open-trackers": return push({ type: "trackers" });
+    case "edit-nick": return openNickname();
     case "seg":
       if (b.dataset.key === "level") { top.level = b.dataset.val; return render(); }
       ui[b.dataset.key] = b.dataset.val; return render();
@@ -541,6 +611,8 @@ $sheet.addEventListener("click", (e) => {
   const b = e.target.closest("[data-act],[data-set]");
   if (!b) return;
   if (b.dataset.act === "close-sheet") { $sheet.hidden = true; return render(); }
+  if (b.dataset.act === "edit-nick") return openNickname();
+  if (b.dataset.act === "save-nick") return saveNickname();
   if (b.dataset.act === "acct-in") { account.signIn().then(() => { if (account.user) toast("로그인했어요"); }); return; }
   if (b.dataset.act === "acct-out") { account.signOut().then(() => toast("로그아웃했어요")); return; }
   if (b.dataset.act === "acct-sync") { account.sync().then((r) => { if (r) toast(r.added ? `기록 ${r.added}개를 가져왔어요` : "동기화했어요"); }); return; }
@@ -579,10 +651,13 @@ function hideSplash() {
 if (new URLSearchParams(location.search).has("nosplash")) $splash?.remove();
 else setTimeout(hideSplash, Math.max(0, 3000 - performance.now()));
 
+let homeKey = "";
 // 계정: 로그인돼 있으면 시작할 때 동기화. 상태가 바뀌면 설정 창·화면 다시 그림
 account.onChange(() => {
   if (!$sheet.hidden && $sheet.querySelector(".sheet").dataset.kind === "settings") openSettings();
-  if (account.status === "idle" && account.lastResult?.added && !ui.stack.length) render();
+  // 홈 인사(이름)·기록이 바뀌었을 수 있으니 홈이면 다시 그림
+  const key = `${account.user?.uid}|${account.user?.displayName}|${store.history.length}|${store.settings.nickname}`;
+  if (key !== homeKey && !ui.stack.length && ui.tab === "home" && $sheet.hidden && account.status !== "signing") { homeKey = key; render(); }
 });
 // 시작 화면이 끝나기 전에 로그인 여부를 확인해서, 필요하면 '구글로 시작하기' 화면을 깔아둠
 const $welcome = document.getElementById("welcome");
@@ -598,6 +673,16 @@ function renderWelcome() {
       <button class="w-skip" data-act="w-skip">로그인 없이 시작하기</button>
     </div>`;
 }
+const greetName = () => store.settings.nickname || account.user?.displayName || "회원";
+function renderNickAsk() {
+  const name = (account.user?.displayName || "").slice(0, NICK_MAX);
+  $welcome.innerHTML = `
+    <div class="w-top"><img src="img/logo.svg" alt=""><h1 class="w-ask">어떻게 불러드릴까요?</h1>
+      <label class="nick-input"><input id="wNick" maxlength="${NICK_MAX}" value="${esc(name)}" placeholder="닉네임" autocomplete="off"><span id="wCnt">${name.length}/${NICK_MAX}</span></label></div>
+    <div class="w-bottom"><button class="btn primary wide" data-act="w-nick">시작하기</button><button class="w-skip" data-act="w-nick-skip">구글 이름 그대로 쓰기</button></div>`;
+  const inp = document.getElementById("wNick");
+  inp.addEventListener("input", () => { document.getElementById("wCnt").textContent = `${inp.value.length}/${NICK_MAX}`; });
+}
 function showWelcome() { renderWelcome(); $welcome.hidden = false; }
 function hideWelcome() { $welcome.classList.add("hide"); setTimeout(() => { $welcome.hidden = true; $welcome.classList.remove("hide"); }, 300); }
 $welcome.addEventListener("click", async (e) => {
@@ -607,11 +692,19 @@ $welcome.addEventListener("click", async (e) => {
   if (b.dataset.act === "w-google") {
     if (!account.available) { account.error = "이 버전에는 구글 로그인이 없어요 (앱에서만 돼요)"; renderWelcome(); return; }
     await account.signIn();
-    if (account.user) { hideWelcome(); render(); toast(`${account.user.displayName || "회원"}님, 환영해요`); }
-    else renderWelcome();
+    if (!account.user) return renderWelcome();
+    // 처음 로그인(계정에도 닉네임이 없음)이면 한 번만 닉네임 묻기
+    if (!store.settings.nickname && !store.sync.askedNick) return renderNickAsk();
+    hideWelcome(); render(); toast(`${greetName()}님, 환영해요`);
+  }
+  if (b.dataset.act === "w-nick" || b.dataset.act === "w-nick-skip") {
+    const v = b.dataset.act === "w-nick" ? document.getElementById("wNick").value.trim().slice(0, NICK_MAX) : "";
+    if (v) store.setSetting("nickname", v);
+    store.setSync({ askedNick: true });
+    hideWelcome(); render(); toast(`${greetName()}님, 환영해요`);
   }
 });
-account.onChange(() => { if (!$welcome.hidden) renderWelcome(); });
+account.onChange(() => { if (!$welcome.hidden && !document.getElementById("wNick")) renderWelcome(); });
 
 account.init().catch((e) => console.warn(e)).finally(() => {
   if (forceWelcome || (account.available && !account.user && !store.sync.skipLogin)) showWelcome();

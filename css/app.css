@@ -106,10 +106,14 @@ select, input[type=number], .field input { min-height: 48px; border: 1.5px solid
 .actions-bottom .btn { flex: 1; }
 
 /* ---------- 홈 ---------- */
-.home-head { display: flex; align-items: center; min-height: 52px; }
+.home-head { display: flex; align-items: center; gap: 10px; min-height: 56px; margin-bottom: 4px; }
+.brand-logo { width: 34px; height: 34px; flex: none; }
+.hello { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hello span { font-size: 13px; color: var(--muted); font-weight: 600; }
+.hello h1 { font-size: 20px; font-weight: 850; letter-spacing: -0.03em; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .brand { font-size: 26px; font-weight: 900; letter-spacing: -0.04em; color: var(--sky-deep); flex: 1; }
 .streak { cursor: pointer; display: inline-flex; align-items: center; gap: 2px; font-weight: 800; color: var(--muted); background: var(--surface); padding: 6px 12px 6px 8px; border-radius: 999px; font-variant-numeric: tabular-nums; }
-.streak svg { width: 18px; height: 18px; }
+.streak svg { width: 22px; height: 22px; stroke: none; }
 .streak.on { color: #d9480f; background: #fff1e8; }
 .date-row { display: flex; align-items: center; justify-content: space-between; min-height: 40px; margin-top: 2px; }
 .date { color: var(--muted); font-weight: 600; }
@@ -439,3 +443,13 @@ body.in-session .tabbar { display: none; }
 .w-note { text-align: center; color: var(--muted); font-size: 13px; line-height: 1.55; margin: 2px 0 0; word-break: keep-all; }
 .w-err { text-align: center; color: var(--bad); font-size: 14px; font-weight: 600; margin: 0; }
 .w-skip { color: var(--sky-deep); font-weight: 700; font-size: 15px; padding: 10px; }
+.nick-row { display: flex; align-items: center; justify-content: space-between; width: 100%; background: #fff; border-radius: 12px; padding: 10px 12px; margin-top: 12px; text-align: left; }
+.nick-row span { display: flex; flex-direction: column; }
+.nick-row small { color: var(--muted); font-size: 12px; font-weight: 600; }
+.nick-row b { font-size: 16px; }
+.nick-row em { font-style: normal; color: var(--sky-deep); font-weight: 800; font-size: 14px; }
+.nick-input { display: flex; align-items: center; gap: 8px; border: 2px solid var(--sky); border-radius: 14px; padding: 0 14px; margin: 14px 0 4px; background: #fff; width: 100%; }
+.nick-input input { flex: 1; min-width: 0; border: 0; outline: none; font: inherit; font-size: 18px; font-weight: 700; min-height: 52px; padding: 0; background: transparent; color: var(--ink); }
+.nick-input span { color: #9aabba; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.w-ask { font-size: 26px !important; color: var(--ink) !important; background: none !important; -webkit-text-fill-color: currentColor; }
+.hello h1 { cursor: pointer; }

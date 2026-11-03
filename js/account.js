@@ -39,6 +39,11 @@ class Account {
     this.changed();
     store.onChange((type, data) => this.onLocalChange(type, data));
     if (this.user) this.sync();
+    // 5분마다 자동 동기화 + 앱을 내리거나 끌 때 한 번 더
+    if (!plugins) {
+      setInterval(() => { if (this.user && this.status !== "syncing") this.sync(); }, 5 * 60 * 1000);
+      document.addEventListener("visibilitychange", () => { if (document.hidden && this.user) this.sync(); });
+    }
   }
 
   /** Firebase가 앱에 들어 있는지 (설정 파일을 넣고 빌드했는지) */
