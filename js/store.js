@@ -24,29 +24,53 @@ function save() {
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* 무시 */ }
 }
 
+// 바뀔 때마다 알림 (계정 동기화용): fn(종류, 내용)
+const listeners = new Set();
+const emit = (type, data) => { for (const f of listeners) { try { f(type, data); } catch (e) { console.warn(e); } } };
+
 export const store = {
+  onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+
   get settings() { return state.settings; },
-  setSetting(k, v) { state.settings[k] = v; save(); },
+  setSetting(k, v) { state.settings[k] = v; save(); emit("profile"); },
 
   get today() { return state.today; },
-  setToday(routine, level = "easy") { state.today = { routine, level }; save(); },
+  setToday(routine, level = "easy") { state.today = { routine, level }; save(); emit("profile"); },
 
   get custom() { return state.custom; },
   saveCustom(r) {
     const i = state.custom.findIndex((c) => c.id === r.id);
     if (i >= 0) state.custom[i] = r; else state.custom.push(r);
     save();
+    emit("profile");
   },
   deleteCustom(id) {
     state.custom = state.custom.filter((c) => c.id !== id);
     if (state.today.routine === id) state.today = { ...DEFAULT.today };
     save();
+    emit("profile");
   },
 
   get history() { return state.history; },
-  addSession(s) { state.history.push(s); save(); },
-  deleteSession(id) { state.history = state.history.filter((h) => h.id !== id); save(); },
-  resetAll() { state = structuredClone(DEFAULT); save(); },
+  addSession(s) { state.history.push(s); save(); emit("session-add", s); },
+  deleteSession(id) { state.history = state.history.filter((h) => h.id !== id); save(); emit("session-delete", id); },
+  resetAll() { const ids = state.history.map((h) => h.id); state = structuredClone(DEFAULT); save(); emit("reset", ids); },
+
+  /** 계정에서 받아온 기록 합치기 (같은 id는 그대로, 없는 것만 추가) */
+  mergeRemote({ history = [], custom = [], settings = null, today = null } = {}) {
+    const have = new Set(state.history.map((h) => h.id));
+    const added = history.filter((h) => h && h.id && !have.has(h.id));
+    state.history = [...state.history, ...added].sort((a, b) => a.ts - b.ts);
+    const cids = new Set(state.custom.map((c) => c.id));
+    state.custom = [...state.custom, ...custom.filter((c) => c && c.id && !cids.has(c.id))];
+    if (settings) state.settings = { ...DEFAULT.settings, ...state.settings, ...settings };
+    if (today) state.today = today;
+    save();
+    return added.length;
+  },
+  /** 계정 동기화 정보 (마지막 동기화 시각 등) — 기기에만 저장 */
+  get sync() { return state.sync || {}; },
+  setSync(v) { state.sync = { ...(state.sync || {}), ...v }; save(); },
 };
 
 // ---------- 통계 ----------

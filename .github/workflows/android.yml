@@ -32,6 +32,15 @@ jobs:
       - name: 패키지 설치
         run: npm install --no-audit --no-fund
 
+      - name: 구글 로그인 플러그인 (firebase/google-services.json 이 있을 때만)
+        run: |
+          if [ -f firebase/google-services.json ]; then
+            npm install --no-save --no-audit --no-fund @capacitor-firebase/authentication@6.3.1 @capacitor-firebase/firestore@6.3.1 firebase@10
+            echo "Firebase 켬"
+          else
+            echo "firebase/google-services.json 없음 → 계정 기능 없이 빌드"
+          fi
+
       - name: 앱 파일 준비 (MediaPipe·모델 포함)
         run: node tools/prepare-www.mjs
 
@@ -80,12 +89,20 @@ jobs:
           sed -i 's#<color name="ic_launcher_background">[^<]*</color>#<color name="ic_launcher_background">\#FFFFFF</color>#' "$RES/values/ic_launcher_background.xml" 2>/dev/null || true
           # 격자 없는 새 아이콘 그림 (resources/android → res)
           cp -r resources/android/. "$RES"/
+          # Firebase 설정 파일 + 구글 로그인 사용 표시
+          if [ -f firebase/google-services.json ]; then
+            cp firebase/google-services.json android/app/google-services.json
+            sed -i 's/^ext {/ext {\n    rgcfaIncludeGoogle = true/' android/variables.gradle
+            cat android/variables.gradle
+          fi
           cat "$RES"/mipmap-anydpi-v26/ic_launcher.xml
           npx cap sync android
 
       - name: APK 빌드
         working-directory: android
         run: |
+          # 항상 같은 서명 키로 빌드 → 폰에서 지우지 않고 덮어 설치 가능 (기록 유지). 구글 로그인도 이 키의 SHA-1로 등록
+          mkdir -p ~/.android && cp ../build-keys/debug.keystore ~/.android/debug.keystore
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 

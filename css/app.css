@@ -413,3 +413,10 @@ body.in-session .tabbar { display: none; }
 .trk-pt.find .dot { fill: var(--sky); stroke: #fff; animation: trkBlink .7s ease-in-out infinite alternate; }
 .trk-pt.moving .dot { r: 12; stroke: var(--sky); stroke-width: 4; }
 @keyframes trkBlink { to { opacity: .35; } }
+.acct { background: var(--surface); border-radius: var(--radius-m); padding: 14px; margin: 4px 0 14px; }
+.acct-row { display: flex; align-items: center; gap: 12px; }
+.acct-row > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.acct-row svg { width: 40px; height: 40px; padding: 8px; border-radius: 50%; background: #fff; color: var(--sky-deep); flex: none; }
+.acct-row img { width: 40px; height: 40px; border-radius: 50%; flex: none; }
+.acct .row-inline .btn { flex: 1; }
+.acct .error { margin-top: 8px; }

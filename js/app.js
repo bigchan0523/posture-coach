@@ -6,6 +6,7 @@ import { AREAS, areaOf, PRESETS, LEVELS, VIEW_TEXT, scaled, estimateMinutes, tot
 import { weekdayBars, trendLine, monthCalendar, rings, dayFractions, RING_COLORS } from "./charts.js";
 import { sfx } from "./sound.js";
 import { PICTOS } from "./pictos.js";
+import { account } from "./account.js";
 import { trackersScreen, mountTrackers, unmountTrackers, onTrackerAct, trackerSummary, setTrackerExercises } from "./trackers-ui.js";
 
 const defs = {};
@@ -33,6 +34,7 @@ const ICON = {
   camera: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
   film: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M10 9.5v5l4-2.5z"/></svg>',
   plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  user: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1.2-3.6 4-5.3 7.5-5.3s6.3 1.7 7.5 5.3"/></svg>',
   tracker: '<svg viewBox="0 0 24 24"><rect x="6" y="8" width="12" height="12" rx="3.5"/><path d="M9 4.8a5 5 0 0 1 6 0M10.6 2.8"/><circle cx="12" cy="14" r="1.6"/></svg>',
   trash: '<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></svg>',
 };
@@ -298,6 +300,7 @@ function calendarBlock() {
 /** 운동 고르기 창 (흰 바탕, 파란 글자, 스크롤) */
 function pickExercise(current, onPick) {
   pickCb = onPick;
+  $sheet.querySelector(".sheet").dataset.kind = "pick";
   $sheet.querySelector(".sheet").innerHTML = `
     <div class="sheet-head"><h2>운동 고르기</h2><button class="text-btn" data-act="close-sheet">닫기</button></div>
     <div class="pick-list">${AREAS.map((a) => `<h3 class="group">${a.name}</h3>${a.exercises.map((ex) => `
@@ -333,8 +336,10 @@ function openSettings() {
   const seg = (key, items) => `<div class="seg small">${items.map(([v, l]) => `<button aria-selected="${s[key] === v}" data-set="${key}" data-val="${v}">${l}</button>`).join("")}</div>`;
   const toggle = (key, label) => `<label class="switch"><span>${label}</span><input type="checkbox" data-set="${key}" ${s[key] ? "checked" : ""}></label>`;
   $sheet.querySelector(".sheet").classList.remove("tall");
+  $sheet.querySelector(".sheet").dataset.kind = "settings";
   $sheet.querySelector(".sheet").innerHTML = `
     <div class="sheet-head"><h2>설정</h2><button class="text-btn" data-act="close-sheet">닫기</button></div>
+    ${accountBlock()}
     <button class="row" data-act="open-trackers"><span class="mark plain">${ICON.tracker}</span><div class="row-main"><b>측정 방법 · 모션 트래커</b><span class="muted">${esc(trackerSummary().src)}</span></div>${ICON.chev}</button>
     <div class="field"><span>카메라</span>${seg("facing", [["user", "앞쪽 (화면 보며)"], ["environment", "뒤쪽 (남이 찍기)"]])}</div>
     <div class="field"><span>인식 정확도</span>${seg("model", [["lite", "빠르게"], ["full", "정확하게"]])}</div>
@@ -345,8 +350,22 @@ function openSettings() {
     ${toggle("sounds", "효과음")}
     ${toggle("debug", "운동 중 각도 표시 (확인용)")}
     <button class="btn outline danger wide" data-act="reset-data">${ui.confirmReset ? "한 번 더 누르면 모든 기록이 지워져요" : "기록 모두 지우기"}</button>
-    <p class="muted small">기록은 이 폰에만 저장돼요.</p>`;
+    <p class="muted small">${account.user ? "기록은 이 폰과 구글 계정에 저장돼요. 지우면 계정에서도 지워져요." : "기록은 이 폰에만 저장돼요. 로그인하면 계정에도 저장돼요."}</p>`;
   $sheet.hidden = false;
+}
+
+// ----- 계정 -----
+const ago = (t) => { if (!t) return "아직 안 함"; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "방금" : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.round(m / 60)}시간 전` : `${Math.round(m / 1440)}일 전`; };
+function accountBlock() {
+  const a = account, u = a.user;
+  const err = a.error ? `<p class="error">${esc(a.error)}</p>` : "";
+  if (!a.ready) return `<div class="acct"><p class="muted">계정 확인 중…</p></div>`;
+  if (!a.available) return `<div class="acct"><div class="acct-row">${ICON.user}<div><b>구글 계정</b><span class="muted small">로그인 준비 중이에요 (Firebase 설정 파일을 넣고 빌드하면 켜져요)</span></div></div></div>`;
+  if (!u) return `<div class="acct"><div class="acct-row">${ICON.user}<div><b>구글 계정으로 로그인</b><span class="muted small">기록이 계정에 저장돼서 앱을 다시 깔거나 폰을 바꿔도 남아요</span></div></div>
+    <button class="btn primary wide" data-act="acct-in" ${a.status === "signing" ? "disabled" : ""}>${a.status === "signing" ? "로그인 중…" : "구글로 로그인"}</button>${err}</div>`;
+  return `<div class="acct"><div class="acct-row">${u.photoUrl ? `<img src="${esc(u.photoUrl)}" alt="" referrerpolicy="no-referrer">` : ICON.user}<div><b>${esc(u.displayName || "내 계정")}</b><span class="muted small">${esc(u.email)}</span></div></div>
+    <p class="muted small">${a.status === "syncing" ? "동기화 중…" : `마지막 동기화 ${ago(store.sync.at)}`}${a.lastResult?.added ? ` · 계정에서 기록 ${a.lastResult.added}개 가져옴` : ""}</p>
+    <div class="row-inline"><button class="btn outline" data-act="acct-sync">지금 동기화</button><button class="btn outline" data-act="acct-out">로그아웃</button></div>${err}</div>`;
 }
 
 function toast(text) {
@@ -522,6 +541,9 @@ $sheet.addEventListener("click", (e) => {
   const b = e.target.closest("[data-act],[data-set]");
   if (!b) return;
   if (b.dataset.act === "close-sheet") { $sheet.hidden = true; return render(); }
+  if (b.dataset.act === "acct-in") { account.signIn().then(() => { if (account.user) toast("로그인했어요"); }); return; }
+  if (b.dataset.act === "acct-out") { account.signOut().then(() => toast("로그아웃했어요")); return; }
+  if (b.dataset.act === "acct-sync") { account.sync().then((r) => { if (r) toast(r.added ? `기록 ${r.added}개를 가져왔어요` : "동기화했어요"); }); return; }
   if (b.dataset.act === "open-trackers") { $sheet.hidden = true; ui.stack.push({ type: "trackers" }); return render(); }
   if (b.dataset.act === "reset-data") {
     if (!ui.confirmReset) { ui.confirmReset = true; return openSettings(); }
@@ -556,6 +578,13 @@ function hideSplash() {
 }
 if (new URLSearchParams(location.search).has("nosplash")) $splash?.remove();
 else setTimeout(hideSplash, Math.max(0, 3000 - performance.now()));
+
+// 계정: 로그인돼 있으면 시작할 때 동기화. 상태가 바뀌면 설정 창·화면 다시 그림
+account.onChange(() => {
+  if (!$sheet.hidden && $sheet.querySelector(".sheet").dataset.kind === "settings") openSettings();
+  if (account.status === "idle" && account.lastResult?.added && !ui.stack.length) render();
+});
+account.init().catch((e) => console.warn(e));
 
 loadDefs().then(render).catch((e) => {
   console.error(e);

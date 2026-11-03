@@ -7,6 +7,7 @@ import { Exercise } from "../js/engine.js";
 import { compile } from "../js/condition.js";
 import { sidePose, frontPose, toLandmarks, cycle } from "./sim.mjs";
 import { runTrackerTests } from "./trackers.mjs";
+import { runAccountTests } from "./account.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const load = (name) => new Exercise(yaml.load(readFileSync(join(root, "exercises", `${name}.yaml`), "utf8")));
@@ -233,6 +234,9 @@ console.log("관절이 안 보일 때");
 
 // ---------- 와이파이 트래커 ----------
 runTrackerTests(check);
+
+// ---------- 계정 동기화 ----------
+await runAccountTests(check);
 
 console.log(`\n결과: ${pass} 통과 / ${fail} 실패`);
 process.exit(fail ? 1 : 0);

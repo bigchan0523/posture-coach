@@ -1,5 +1,13 @@
 {
   "appId": "com.posturecoach.app",
   "appName": "자코자코",
-  "webDir": "www"
+  "webDir": "www",
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": [
+        "google.com"
+      ]
+    }
+  }
 }
