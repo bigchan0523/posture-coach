@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "116239430273",
+    "project_id": "jakojako-bf991",
+    "storage_bucket": "jakojako-bf991.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:116239430273:android:4e1d72c2cffe834f431380",
+        "android_client_info": {
+          "package_name": "com.posturecoach.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "116239430273-in7hdq8frdj6hf9r4ep3a22ha60h50tl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.posturecoach.app",
+            "certificate_hash": "2c8f76bcfe75f1390c32d57fabf1df349500b792"
+          }
+        },
+        {
+          "client_id": "116239430273-n6547f7cbkl849ihioimfn9dmlrmsu5b.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA95u95KCb12XwVX4rRzikwoln5TZFbg9Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "116239430273-n6547f7cbkl849ihioimfn9dmlrmsu5b.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
