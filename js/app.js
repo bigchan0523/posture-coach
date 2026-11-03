@@ -584,7 +584,39 @@ account.onChange(() => {
   if (!$sheet.hidden && $sheet.querySelector(".sheet").dataset.kind === "settings") openSettings();
   if (account.status === "idle" && account.lastResult?.added && !ui.stack.length) render();
 });
-account.init().catch((e) => console.warn(e));
+// 시작 화면이 끝나기 전에 로그인 여부를 확인해서, 필요하면 '구글로 시작하기' 화면을 깔아둠
+const $welcome = document.getElementById("welcome");
+const forceWelcome = new URLSearchParams(location.search).has("welcome");
+const G_LOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.8c4.3-4 6.9-9.9 6.9-17.2z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.8c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.1-13.4-9.9l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>';
+function renderWelcome() {
+  const busy = account.status === "signing" || account.status === "syncing";
+  $welcome.innerHTML = `
+    <div class="w-top"><img src="img/logo.svg" alt=""><h1>자코자코</h1><p>카메라와 트래커로<br>운동 자세를 바로잡아요</p></div>
+    <div class="w-bottom">
+      <button class="w-google" data-act="w-google" ${busy ? "disabled" : ""}>${G_LOGO}<span>${account.status === "signing" ? "로그인 중…" : account.status === "syncing" ? "기록 불러오는 중…" : "Google로 시작하기"}</span></button>
+      <p class="w-note">처음이면 자동으로 가입돼요. 운동 기록이 계정에 저장돼서<br>앱을 다시 깔거나 폰을 바꿔도 그대로 남아요</p>
+      ${account.error ? `<p class="w-err">${esc(account.error)}</p>` : ""}
+      <button class="w-skip" data-act="w-skip">로그인 없이 시작하기</button>
+    </div>`;
+}
+function showWelcome() { renderWelcome(); $welcome.hidden = false; }
+function hideWelcome() { $welcome.classList.add("hide"); setTimeout(() => { $welcome.hidden = true; $welcome.classList.remove("hide"); }, 300); }
+$welcome.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-act]");
+  if (!b) return;
+  if (b.dataset.act === "w-skip") { store.setSync({ skipLogin: true }); hideWelcome(); return; }
+  if (b.dataset.act === "w-google") {
+    if (!account.available) { account.error = "이 버전에는 구글 로그인이 없어요 (앱에서만 돼요)"; renderWelcome(); return; }
+    await account.signIn();
+    if (account.user) { hideWelcome(); render(); toast(`${account.user.displayName || "회원"}님, 환영해요`); }
+    else renderWelcome();
+  }
+});
+account.onChange(() => { if (!$welcome.hidden) renderWelcome(); });
+
+account.init().catch((e) => console.warn(e)).finally(() => {
+  if (forceWelcome || (account.available && !account.user && !store.sync.skipLogin)) showWelcome();
+});
 
 loadDefs().then(render).catch((e) => {
   console.error(e);

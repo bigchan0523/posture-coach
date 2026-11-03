@@ -59,7 +59,7 @@ class Account {
   async signOut() {
     try { await this.auth?.signOut(); } catch (e) { console.warn(e); }
     this.user = null;
-    store.setSync({ uid: null, at: null });
+    store.setSync({ uid: null, at: null, skipLogin: false }); // 로그아웃하면 다음 실행 때 다시 로그인 화면
     this.status = "idle";
     this.changed();
   }
