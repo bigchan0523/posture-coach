@@ -92,7 +92,7 @@ function homeScreen() {
   return `
   <header class="home-head">
     <img class="brand-logo" src="img/logo.svg" alt="자코자코">
-    <div class="hello"><span>${now.getMonth() + 1}월 ${now.getDate()}일 ${WEEK[now.getDay()]}요일</span><h1 data-act="edit-nick" role="button" aria-label="닉네임 바꾸기">${greeting()}</h1></div>
+    <div class="hello"><span>${now.getMonth() + 1}월 ${now.getDate()}일 ${WEEK[now.getDay()]}요일${helloName()}</span><h1>${greeting()}</h1></div>
     <div class="bar-right">
       ${streakChip(st)}
       <button class="icon-btn" data-act="settings" aria-label="설정">${ICON.gear}</button>
@@ -145,22 +145,22 @@ const GREETS = {
   ash: ["다시 불 붙여볼까요?", "오늘부터 다시 1일!", "다시 가볍게 시작!"],
   hot: ["벌써 연속 {n}일째!", "불꽃이 꺼지지 않게!", "연속 {n}일 이어가요"],
   morning: ["좋은 아침이에요", "몸 풀고 시작해요", "아침 운동 어때요?"],
-  day: ["오늘도 가볍게!", "잠깐 스트레칭 어때요?", "10분이면 충분해요"],
+  day: ["오늘도 가볍게!", "스트레칭 어때요?", "10분이면 충분해요"],
   evening: ["오늘도 고생했어요", "마무리 운동 한 판?", "가볍게 몸 풀어요"],
   night: ["5분이면 충분해요", "자기 전 스트레칭!", "자기 전 한 세트?"],
 };
 const greetSeed = Math.random();
 function greeting() {
-  const name = (store.settings.nickname || account.user?.displayName || "").trim();
   const n = streak();
   const doneToday = store.history.some((h) => dayKey(h.ts) === dayKey(new Date()));
   const hr = new Date().getHours();
   const key = doneToday ? "done" : n === 0 && store.history.length ? "ash" : n >= 7 ? "hot"
     : hr >= 5 && hr < 11 ? "morning" : hr < 17 && hr >= 11 ? "day" : hr >= 17 && hr < 22 ? "evening" : "night";
   const list = GREETS[key];
-  const msg = list[Math.floor(greetSeed * list.length)].replace("{n}", n);
-  return name ? `${esc(name)}님, ${msg}` : msg;
+  return list[Math.floor(greetSeed * list.length)].replace("{n}", n);
 }
+// 닉네임은 날짜 줄에 (인사 문구가 한 줄에 다 보이게)
+const helloName = () => { const n = (store.settings.nickname || account.user?.displayName || "").trim(); return n ? ` · ${esc(n)}님` : ""; };
 
 // 연속 기록 불꽃: 기록이 쌓일수록 불꽃반응 색으로 등급이 올라감
 // (리튬 빨강 → 칼슘 주황 → 나트륨 노랑 → 바륨 초록 → 구리 청록 → 칼륨 보라 → 스트론튬 분홍)
@@ -397,7 +397,6 @@ function openSettings() {
 }
 
 // ----- 계정 -----
-const ago = (t) => { if (!t) return "아직 안 함"; const m = Math.round((Date.now() - t) / 60000); return m < 1 ? "방금" : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.round(m / 60)}시간 전` : `${Math.round(m / 1440)}일 전`; };
 // 닉네임 줄 (로그인 안 해도 바꿀 수 있음)
 const nickRow = () => `<button class="nick-row" data-act="edit-nick"><span><small>닉네임</small><b>${esc(store.settings.nickname || account.user?.displayName || "정하지 않음")}</b></span><em>바꾸기</em></button>`;
 function accountBlock() {
@@ -409,8 +408,7 @@ function accountBlock() {
     ${nickRow()}<button class="btn primary wide" data-act="acct-in" ${a.status === "signing" ? "disabled" : ""}>${a.status === "signing" ? "로그인 중…" : "구글로 로그인"}</button>${err}</div>`;
   return `<div class="acct"><div class="acct-row">${u.photoUrl ? `<img src="${esc(u.photoUrl)}" alt="" referrerpolicy="no-referrer">` : ICON.user}<div><b>${esc(u.displayName || "내 계정")}</b><span class="muted small">${esc(u.email)}</span></div></div>
     ${nickRow()}
-    <p class="muted small">${a.status === "syncing" ? "동기화 중…" : `마지막 동기화 ${ago(store.sync.at)} · 5분마다 자동`}${a.lastResult?.added ? ` · 계정에서 기록 ${a.lastResult.added}개 가져옴` : ""}</p>
-    <div class="row-inline"><button class="btn outline" data-act="acct-sync">지금 동기화</button><button class="btn outline" data-act="acct-out">로그아웃</button></div>${err}</div>`;
+    <button class="btn outline wide" data-act="acct-out">로그아웃</button>${err}</div>`;
 }
 
 // ----- 닉네임 -----

@@ -107,7 +107,7 @@ class Session {
         const why = rig.error ? rig.error
           : rig.assignedCount < rig.set.n ? "트래커 부위 지정이 아직 안 됐어요"
           : rig.liveCount < rig.assignedCount ? `트래커 ${rig.liveCount}/${rig.assignedCount}개만 연결돼 있어요. 전원과 와이파이를 확인해주세요`
-          : "트래커 보정(똑바로 서기 → 살짝 앉기)을 먼저 해주세요";
+          : "트래커 화면에서 보정을 먼저 해주세요";
         this.showPanel(`<h2 class="p-title">트래커 준비가 안 됐어요</h2><p class="p-lead">${esc(why)}</p>
           <div class="p-actions"><button class="btn" data-act="use-camera">카메라로 하기</button><button class="btn primary" data-act="tracker-setup">트래커 설정</button></div>`);
         this.el.controls.hidden = true;

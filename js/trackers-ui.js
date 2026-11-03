@@ -54,7 +54,7 @@ export function trackersScreen(backBar) {
   <section class="block">
     <h3>트래커 개수</h3>
     <p class="muted">가지고 있는 트래커 수에 맞게 골라주세요</p>
-    <div class="trk-sets">${SETS.map((x) => `<button class="trk-set${x.id === rig.set.id ? " on" : ""}" data-act="trk-set" data-val="${x.id}">
+    <div class="trk-sets">${SETS.filter((x) => !x.hidden).map((x) => `<button class="trk-set${x.id === rig.set.id ? " on" : ""}" data-act="trk-set" data-val="${x.id}">
       <b>x${x.n}</b><span><strong>${x.name}</strong><small>${x.note}</small></span></button>`).join("")}</div>
   </section>
 
@@ -71,7 +71,7 @@ export function trackersScreen(backBar) {
     <p class="muted">트래커를 몸에 붙인 뒤, 운동 전에 한 번. 붙이는 방향은 아무렇게나 해도 돼요</p>
     <div class="trk-cal">
       <button class="btn outline" data-act="trk-cal1"><b>1</b> 똑바로 서기</button>
-      <button class="btn outline" data-act="trk-cal2"><b>2</b> 살짝 앉기</button>
+      <button class="btn outline" data-act="trk-cal2"><b>2</b> ${rig.hasLegs ? "살짝 앉기" : "상체 숙이기"}</button>
     </div>
     <p id="trkCalMsg" class="trk-msg" aria-live="polite"></p>
   </section>
@@ -232,14 +232,14 @@ export function onTrackerAct(act, b, rerender) {
       countdown("똑바로 서서 앞을 보세요…", "stand", () => {
         const r = rig.calibrateStand();
         if (!r.ok) return r;
-        return { ok: true, text: rig.ready ? "다시 맞췄어요" : `1단계 완료${r.missing.length ? ` (연결 안 된 부위: ${r.missing.join(", ")})` : ""}. 이제 2단계: 무릎을 앞으로 내밀며 살짝 앉아요`, say: rig.ready ? "다시 맞췄어요" : "이제 살짝 앉아주세요" };
+        return { ok: true, text: rig.ready ? "다시 맞췄어요" : `1단계 완료${r.missing.length ? ` (연결 안 된 부위: ${r.missing.join(", ")})` : ""}. 이제 2단계: ${rig.hasLegs ? "무릎을 앞으로 내밀며 살짝 앉아요" : "인사하듯 상체를 앞으로 숙여요"}`, say: rig.ready ? "다시 맞췄어요" : rig.hasLegs ? "이제 살짝 앉아주세요" : "이제 상체를 숙여주세요" };
       });
       return true;
     case "trk-cal2":
       ui.msg = "";
-      countdown("무릎을 앞으로, 살짝 앉으세요…", "calib", () => {
+      countdown(rig.hasLegs ? "무릎을 앞으로, 살짝 앉으세요…" : "인사하듯 상체를 숙이세요…", rig.hasLegs ? "calib" : "bow", () => {
         const r = rig.calibrateForward();
-        rig.setDemoScene("squat");
+        rig.setDemoScene(rig.hasLegs ? "squat" : "bicep_curl");
         return r.ok ? { ok: true, text: "보정 완료! 아래 미리보기에서 움직임을 확인해보세요", say: "보정 완료" } : r;
       });
       return true;
@@ -258,11 +258,13 @@ function preview() {
   viewer.render(rig.skeleton(), {
     forward: rig.viewForward,
     empty: rig.calib?.done ? "골반 트래커가 연결 안 됐어요" : "보정하면 여기에 뼈대가 보여요",
-    labels: a ? [{ at: "left_knee", text: f(a.leftKnee) }, { at: "right_knee", text: f(a.rightKnee) }] : [],
+    labels: !a ? [] : rig.hasLegs ? [{ at: "left_knee", text: f(a.leftKnee) }, { at: "right_knee", text: f(a.rightKnee) }]
+      : [{ at: "left_elbow", text: f(a.leftElbow) }, { at: "right_elbow", text: f(a.rightElbow) }],
   });
   const el = document.getElementById("trkAngles");
   if (el) {
-    const html = a ? `<span>무릎 왼 <b>${f(a.leftKnee)}</b> 오 <b>${f(a.rightKnee)}</b></span><span>엉덩이 왼 <b>${f(a.leftHip)}</b> 오 <b>${f(a.rightHip)}</b></span><span>상체 숙임 <b>${f(a.trunk)}</b></span>` : "";
+    const html = !a ? "" : !rig.hasLegs ? `<span>팔꿈치 왼 <b>${f(a.leftElbow)}</b> 오 <b>${f(a.rightElbow)}</b></span><span>상체 숙임 <b>${f(a.trunk)}</b></span>`
+      : a ? `<span>무릎 왼 <b>${f(a.leftKnee)}</b> 오 <b>${f(a.rightKnee)}</b></span><span>엉덩이 왼 <b>${f(a.leftHip)}</b> 오 <b>${f(a.rightHip)}</b></span><span>상체 숙임 <b>${f(a.trunk)}</b></span>${a.leftElbow != null ? `<span>팔꿈치 왼 <b>${f(a.leftElbow)}</b> 오 <b>${f(a.rightElbow)}</b></span>` : ""}` : "";
     if (el.innerHTML !== html) el.innerHTML = html;
   }
 }

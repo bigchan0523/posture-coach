@@ -83,15 +83,19 @@ export const PARTS = [
 const PART = Object.fromEntries(PARTS.map((p) => [p.id, p]));
 const LEGS = ["l_thigh", "r_thigh", "l_shin", "r_shin"];
 
-// 트래커 개수 세트 (SlimeVR 서버 GUI의 ASSIGNMENT_MODES와 같은 구성 + 팔 운동용 12개)
+const ARMS = ["l_upper_arm", "r_upper_arm", "l_lower_arm", "r_lower_arm"];
+
+// 트래커 개수 세트: 6개(다리용 / 팔용) · 10개(다리 + 팔). 팔·다리는 한쪽에 2개씩 (위팔·아래팔 / 허벅지·정강이)
 export const SETS = [
-  { id: "lower", n: 5, name: "하반신 세트", note: "가슴 + 다리", parts: ["chest", ...LEGS] },
-  { id: "core", n: 6, name: "코어 세트", note: "+ 골반", parts: ["chest", "hip", ...LEGS] },
-  { id: "enhanced", n: 8, name: "향상된 코어 세트", note: "+ 양발 (카프 레이즈 가능)", parts: ["chest", "hip", ...LEGS, "l_foot", "r_foot"] },
-  { id: "full", n: 10, name: "풀 바디 세트", note: "+ 위팔 (팔꿈치 위치)", parts: ["chest", "hip", "l_upper_arm", "r_upper_arm", ...LEGS, "l_foot", "r_foot"] },
-  { id: "arms", n: 12, name: "팔 운동 세트", note: "+ 아래팔 (팔 운동까지 전부)", parts: ["chest", "hip", "l_upper_arm", "r_upper_arm", "l_lower_arm", "r_lower_arm", ...LEGS, "l_foot", "r_foot"] },
-  { id: "all", n: 20, name: "전부 다", note: "머리·목·어깨·손까지", parts: PARTS.map((p) => p.id) },
+  { id: "core", n: 6, name: "하체 세트", note: "가슴·골반 + 양다리 · 하체 운동", parts: ["chest", "hip", ...LEGS] },
+  { id: "arms6", n: 6, name: "팔 세트", note: "가슴·골반 + 양팔 · 팔 운동", parts: ["chest", "hip", ...ARMS] },
+  { id: "full", n: 10, name: "풀 바디 세트", note: "가슴·골반 + 양다리 + 양팔", parts: ["chest", "hip", ...LEGS, ...ARMS] },
+  // 화면에는 안 보임 (테스트·확장용)
+  { id: "all", n: 20, hidden: true, name: "전부 다", note: "", parts: PARTS.map((p) => p.id) },
 ];
+// 예전 버전에서 고른 세트 → 지금 세트
+const OLD_SETS = { lower: "core", enhanced: "core", arms: "full" };
+
 // 펌웨어가 알려주는 부착 위치 번호 (SlimeVR SensorPosition)
 const FW_POSITION = {
   1: "head", 2: "neck", 3: "upper_chest", 4: "chest", 5: "waist", 6: "hip", 7: "l_thigh", 8: "r_thigh", 9: "l_shin", 10: "r_shin",
@@ -175,11 +179,12 @@ class DemoSource {
 export function demoDirections(sim, scene, t) {
   const { sidePose, frontPose, cycle } = sim;
   if (scene.startsWith("shake:")) scene = "stand";
-  const k = scene === "stand" ? 0 : scene === "calib" ? Math.min(1, t / 0.6) * 0.45 : t < 1 ? 0 : cycle(((t - 1) % 2.6) / 2.6);
+  const k = scene === "stand" ? 0 : scene === "calib" || scene === "bow" ? Math.min(1, t / 0.6) * 0.45 : t < 1 ? 0 : cycle(((t - 1) % 2.6) / 2.6);
   const nth = Math.floor((t - 1) / 2.6), alt = nth % 2 === 0, d = nth % 3 === 2 ? 0.45 : 1, kd = k * d;
   const S = {
     stand: () => sidePose({}),
     calib: () => sidePose({ trunk: 20 * k, L: { hip: 60 * k, knee: 80 * k } }),
+    bow: () => sidePose({ trunk: 70 * k }),
     squat: () => sidePose({ trunk: 40 * kd, L: { hip: 95 * kd, knee: 120 * kd } }),
     lunge: () => { const f = { hip: 80 * kd, knee: 90 * kd }, b = { hip: -25 * kd, knee: 100 * kd }; return sidePose({ trunk: 5 * kd, L: alt ? f : b, R: alt ? b : f }); },
     side_lunge: () => frontPose({ drop: 0.35 * kd, caveL: -0.35 * kd, legL: { abd: 30 }, legR: { abd: 30 } }),
@@ -255,10 +260,14 @@ class TrackerRig {
     this.changed();
   }
   /** 고른 트래커 개수 세트 */
-  get set() { return SETS.find((x) => x.id === store.settings.trackerSet) || SETS[1]; }
-  setSet(id) { store.setSetting("trackerSet", id); this.changed(); }
-  /** 지금 세트의 부위 (세트 밖이어도 이미 지정한 부위는 계속 씀) */
-  get parts() { const ids = new Set(this.set.parts); return PARTS.filter((p) => ids.has(p.id) || this.assign[p.id]); }
+  get set() { const id = store.settings.trackerSet; return SETS.find((x) => x.id === (OLD_SETS[id] || id)) || SETS[0]; }
+  setSet(id) { store.setSetting("trackerSet", id); this.calib = null; this.changed(); }
+  /** 지금 세트의 부위 (세트 밖 부위는 지정돼 있어도 안 씀) */
+  get parts() { const ids = new Set(this.set.parts); return PARTS.filter((p) => ids.has(p.id)); }
+  inSet(part) { return this.set.parts.includes(part); }
+  /** 세트에 다리 / 팔이 있는지 */
+  get hasLegs() { return LEGS.every((p) => this.inSet(p)); }
+  get hasArms() { return ARMS.every((p) => this.inSet(p)); }
 
   /** 수신 시작 (이미 켜져 있으면 그대로) */
   async start() {
@@ -305,13 +314,16 @@ class TrackerRig {
   changed() { for (const f of this.listeners) f(); }
 
   list() { return [...this.trackers.values()]; }
-  tracker(part) { const id = this.assign[part]; return id ? this.trackers.get(id) : null; }
+  tracker(part) { const id = this.inSet(part) && this.assign[part]; return id ? this.trackers.get(id) : null; }
   live(part) { const t = this.tracker(part); return t && t.connected && t.hasRot && t.age >= 0 && t.age < 1500 ? t : null; }
   partOf(id) { return Object.keys(this.assign).find((p) => this.assign[p] === id) || null; }
   get assignedCount() { return this.parts.filter((p) => this.assign[p.id]).length; }
   get liveCount() { return this.parts.filter((p) => this.live(p.id)).length; }
-  /** 판정에 꼭 필요한 부위: 몸통 하나(골반·허리·가슴 중) + 양 허벅지 + 양 정강이 */
-  get ready() { return !!this.calib?.done && SPINE_ROOT.some((p) => this.live(p)) && LEGS.every((p) => this.live(p)); }
+  /** 판정에 꼭 필요한 부위: 몸통 하나(골반·허리·가슴 중) + 세트에 있는 팔·다리 */
+  get ready() {
+    const limbs = [...(this.hasLegs ? LEGS : []), ...(this.hasArms ? ARMS : [])];
+    return !!this.calib?.done && SPINE_ROOT.some((p) => this.live(p)) && limbs.every((p) => this.live(p));
+  }
   /** 지금 가장 많이 움직이는 트래커 (흔들어서 찾기) */
   mostMoving(exclude = []) {
     let best = null;
@@ -324,13 +336,13 @@ class TrackerRig {
   supports(points, ex = "") {
     const need = new Set(points.map((n) => n.replace(/^(left|right|front|back)_/, "")));
     if (ex === "calf_raise") need.add("heel"); // 발뒤꿈치 높이로 셈 → 발 트래커 필요
-    const has = (p) => !!this.assign[p];
+    const has = (p) => this.inSet(p) && !!this.assign[p];
     for (const j of need) {
       const groups = NEED[j];
       if (!groups) continue; // 코·귀 등은 몸통에서 계산
       if (!groups.every((alts) => alts.some(has))) return false;
     }
-    return LEGS.every(has) && SPINE_ROOT.some(has);
+    return SPINE_ROOT.some(has);
   }
 
   // ---------- 보정 ----------
@@ -357,15 +369,18 @@ class TrackerRig {
     return { ok: true, missing };
   }
 
-  /** 2단계: 살짝 앉은 자세에서 허벅지가 나간 방향 = 몸의 앞쪽 */
+  /** 2단계: 몸의 앞쪽 찾기
+   *  다리 트래커가 있으면 살짝 앉은 자세에서 허벅지가 나간 방향, 없으면(팔 세트) 상체를 숙인 방향 */
   calibrateForward() {
     if (!this.calib) return { ok: false, msg: "먼저 똑바로 서서 1단계를 해주세요" };
-    const ds = ["l_thigh", "r_thigh"].map((p) => this.rel(p) && qrot(this.rel(p), DOWN)).filter(Boolean);
-    if (!ds.length) return { ok: false, msg: "허벅지 트래커가 필요해요" };
+    const thighs = ["l_thigh", "r_thigh"].map((p) => this.rel(p) && qrot(this.rel(p), DOWN)).filter(Boolean);
+    const torso = SPINE_ROOT.map((p) => this.rel(p) && qrot(this.rel(p), UP)).filter(Boolean);
+    const ds = thighs.length ? thighs : torso;
+    if (!ds.length) return { ok: false, msg: "골반이나 가슴 트래커가 필요해요" };
     let h = [0, 0, 0];
     for (const d of ds) h = add(h, [d[0], 0, d[2]]);
     h = mul(h, 1 / ds.length);
-    if (Math.hypot(h[0], h[2]) < 0.25) return { ok: false, msg: "조금 더 앉아주세요 (무릎을 앞으로)" };
+    if (Math.hypot(h[0], h[2]) < 0.25) return { ok: false, msg: thighs.length ? "조금 더 앉아주세요 (무릎을 앞으로)" : "상체를 조금 더 숙여주세요" };
     const fwdWorld = flat(h);
     // 부위별 '기준 자세에서의 앞쪽' = 지금 회전을 되돌린 방향
     const fwd = {};
@@ -409,13 +424,14 @@ class TrackerRig {
   standingStill() {
     if (!this.calib) return false;
     let n = 0;
-    for (const p of [...SPINE_ROOT, ...LEGS]) {
+    const legs = this.hasLegs;
+    for (const p of [...SPINE_ROOT, ...(legs ? LEGS : [])]) {
       const t = this.live(p);
       if (!t || !this.calib.q0[p]) { if (LEGS.includes(p)) return false; continue; }
       n++;
       if (angle3(this.dir(p), this.restDir(p)) > 15 || t.motion > 25) return false;
     }
-    return n >= 5;
+    return n >= (legs ? 5 : 1);
   }
   /** 자동 재보정할 부위: 몸통·다리·발 (팔은 운동 사이 자세가 제각각이라 제외) */
   get bodyParts() { return ["head", "neck", ...SPINE_ROOT, ...LEGS, "l_foot", "r_foot"]; }

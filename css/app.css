@@ -109,7 +109,7 @@ select, input[type=number], .field input { min-height: 48px; border: 1.5px solid
 .home-head { display: flex; align-items: center; gap: 10px; min-height: 56px; margin-bottom: 4px; }
 .brand-logo { width: 34px; height: 34px; flex: none; }
 .hello { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.hello span { font-size: 13px; color: var(--muted); font-weight: 600; }
+.hello span { font-size: 13px; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hello h1 { font-size: 20px; font-weight: 850; letter-spacing: -0.03em; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .brand { font-size: 26px; font-weight: 900; letter-spacing: -0.04em; color: var(--sky-deep); flex: 1; }
 .streak { cursor: pointer; display: inline-flex; align-items: center; gap: 2px; font-weight: 800; color: var(--muted); background: var(--surface); padding: 6px 12px 6px 8px; border-radius: 999px; font-variant-numeric: tabular-nums; }
@@ -452,7 +452,6 @@ body.in-session .tabbar { display: none; }
 .nick-input input { flex: 1; min-width: 0; border: 0; outline: none; font: inherit; font-size: 18px; font-weight: 700; min-height: 52px; padding: 0; background: transparent; color: var(--ink); }
 .nick-input span { color: #9aabba; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .w-ask { font-size: 26px !important; color: var(--ink) !important; background: none !important; -webkit-text-fill-color: currentColor; }
-.hello h1 { cursor: pointer; }
 
 /* ---------- 종료 확인 ---------- */
 .exit-wrap { position: fixed; inset: 0; z-index: 120; background: rgba(15,39,64,.45); display: flex; align-items: center; justify-content: center; padding: 0 24px; animation: exitIn .18s ease; }
