@@ -464,9 +464,10 @@ class TrackerRig {
       const la = this.dir(`${side}_lower_arm`) || (R(`${side}_upper_arm`) ? ua : mul(top.up, -1));
       const wr = add(el, mul(la, BONE.lowerArm));
       const hn = this.dir(`${side}_hand`) || la;
-      // 손: SlimeVR은 VR 컨트롤러를 쥔 자세라 손이 앞으로 굽어 있지만, 운동할 땐 맨손이라 아래팔(또는 손 트래커) 방향으로 곧게 + 손가락 끝
-      const hand = add(wr, mul(hn, BONE.hand));
-      const finger = add(hand, mul(hn, 0.06));
+      // 손: SlimeVR처럼 손목에서 살짝 앞으로 굽은 모양 (덤벨·컨트롤러를 쥔 자세, handDistanceY/Z) + 손가락 끝
+      const fwdArm = norm(sub(top.f, mul(hn, dot(top.f, hn))));
+      const hand = R(`${side}_hand`) ? add(wr, mul(hn, BONE.hand)) : add(wr, add(mul(hn, 0.05), mul(fwdArm, 0.04)));
+      const finger = add(hand, add(mul(hn, 0.03), mul(fwdArm, 0.035)));
       return { sh, el, wr, hand, finger };
     };
     const aL = arm("l", 1), aR = arm("r", -1);
