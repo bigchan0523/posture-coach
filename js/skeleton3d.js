@@ -13,15 +13,19 @@ const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a
 const norm = (a) => { const n = Math.hypot(...a) || 1; return mul(a, 1 / n); };
 const rad = (d) => (d * Math.PI) / 180;
 
-// 뼈 색 (SlimeVR 화면과 비슷하게: 몸통 빨강, 허벅지 연두, 정강이 청록, 어깨·골반 분홍)
-const C = { spine: "#ff4d5e", chest: "#c03adf", shoulder: "#34e0f0", hip: "#ff9ec4", thigh: "#b4f22e", shin: "#14a6b4", foot: "#ffd23f", head: "#34e0f0", upperArm: "#ff8a3d", lowerArm: "#ffc23d", hand: "#ff6fb5" };
-// [시작, 끝, 색, 트래커가 있어야 그리는 관절(없으면 흐리게)]
+// 뼈 색: SlimeVR 서버 GUI(utils/skeletonHelper.ts, MIT/Apache-2.0)의 boneColor 그대로
+const C = {
+  hipSeg: "red", chest: "purple", upperChest: "chartreuse", neck: "chartreuse", shoulder: "#00ffff", hip: "pink",
+  thigh: "chartreuse", shin: "teal", foot: "gold", upperArm: "indianred", lowerArm: "red", hand: "fuchsia",
+};
+// [시작, 끝, 색, 트래커가 있어야 그리는 관절(없으면 안 그림)]
 const BONES = [
-  ["mid_hip", "waist", C.spine], ["waist", "chest", C.spine], ["chest", "mid_sh", C.chest], ["mid_sh", "neck_top", C.head],
+  ["mid_hip", "waist", C.hipSeg], ["waist", "chest", C.chest], ["chest", "mid_sh", C.upperChest], ["mid_sh", "neck_top", C.neck],
+  ["neck_top", "left_shoulder", C.shoulder], ["neck_top", "right_shoulder", C.shoulder],
   ["left_shoulder", "left_elbow", C.upperArm, "left_elbow"], ["right_shoulder", "right_elbow", C.upperArm, "right_elbow"],
   ["left_elbow", "left_wrist", C.lowerArm, "left_wrist"], ["right_elbow", "right_wrist", C.lowerArm, "right_wrist"],
   ["left_wrist", "left_hand", C.hand, "left_hand"], ["right_wrist", "right_hand", C.hand, "right_hand"],
-  ["left_shoulder", "right_shoulder", C.shoulder], ["left_hip", "right_hip", C.hip],
+  ["left_hip", "right_hip", C.hip],
   ["left_hip", "left_knee", C.thigh], ["right_hip", "right_knee", C.thigh],
   ["left_knee", "left_ankle", C.shin], ["right_knee", "right_ankle", C.shin],
   ["left_heel", "left_foot_index", C.foot], ["right_heel", "right_foot_index", C.foot],
@@ -50,7 +54,7 @@ export class Skeleton3D {
     canvas.addEventListener("dblclick", () => this.reset());
   }
 
-  reset(view = "free") { const v = VIEWS[view]; this.yaw = v.yaw; this.pitch = v.pitch; this.dist = 3.4; }
+  reset(view = "free") { const v = VIEWS[view]; this.yaw = v.yaw; this.pitch = v.pitch; this.dist = 3.0; }
   setView(view) { this.reset(view); }
 
   down(e) {
@@ -97,7 +101,7 @@ export class Skeleton3D {
     let F = opts.forward ? norm([opts.forward[0], 0, opts.forward[2]]) : [0, 0, 1];
     if (!isFinite(F[0])) F = [0, 0, 1];
     const L = norm(cross(UP, F));
-    const target = [0, 0.85, 0];
+    const target = [0, 0.75, 0];
     const yw = rad(this.yaw), pt = rad(this.pitch);
     const dir = add(mul(add(mul(F, Math.cos(yw)), mul(L, Math.sin(yw))), Math.cos(pt)), mul(UP, Math.sin(pt)));
     const cam = add(target, mul(dir, this.dist));
@@ -170,13 +174,13 @@ export class Skeleton3D {
       items.push({ z: (A.z + B.z) / 2, draw: () => {
         ctx.globalAlpha = faint ? 0.25 : 1;
         ctx.strokeStyle = opts.alert && !need ? "#ff5a5f" : col;
-        ctx.lineWidth = Math.max(3, (0.055 * focal) / ((A.z + B.z) / 2));
+        ctx.lineWidth = 3.5 * dpr; // SlimeVR처럼 굵기 일정한 얇은 선
         ctx.lineCap = "round";
         ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
         ctx.globalAlpha = 1;
       } });
     }
-    for (const j of JOINTS) {
+    if (opts.joints) for (const j of JOINTS) {
       const A = pp[j];
       if (!A || (/elbow|wrist/.test(j) && !tracked[j])) continue;
       items.push({ z: A.z - 0.01, draw: () => {
@@ -184,11 +188,7 @@ export class Skeleton3D {
         ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(A.x, A.y, rr, 0, Math.PI * 2); ctx.fill();
       } });
     }
-    const hp = proj(sk.head || add(P.neck_top, mul(norm(sub(P.neck_top, P.mid_sh)), 0.11)));
-    if (hp) items.push({ z: hp.z, draw: () => {
-      ctx.fillStyle = this.dark ? "#e8f4ff" : "#0f2740";
-      ctx.beginPath(); ctx.arc(hp.x, hp.y, (0.1 * focal) / hp.z, 0, Math.PI * 2); ctx.fill();
-    } });
+    // 머리는 판정에 안 쓰여서 그리지 않음 (몸이 화면을 더 크게 쓰도록)
     items.sort((a, b) => b.z - a.z).forEach((it) => it.draw());
 
     // 각도 숫자
