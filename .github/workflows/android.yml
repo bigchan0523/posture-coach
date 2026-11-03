@@ -102,7 +102,21 @@ jobs:
         working-directory: android
         run: |
           # 항상 같은 서명 키로 빌드 → 폰에서 지우지 않고 덮어 설치 가능 (기록 유지). 구글 로그인도 이 키의 SHA-1로 등록
-          mkdir -p ~/.android && cp ../build-keys/debug.keystore ~/.android/debug.keystore
+          # (~/.android에 두는 방식은 러너에서 무시돼서, 빌드 설정에 직접 지정)
+          cat >> app/build.gradle <<'GRADLE'
+
+          android {
+              signingConfigs {
+                  debug {
+                      storeFile file("${rootDir}/../build-keys/debug.keystore")
+                      storePassword "android"
+                      keyAlias "androiddebugkey"
+                      keyPassword "android"
+                  }
+              }
+          }
+          GRADLE
+          tail -12 app/build.gradle
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
