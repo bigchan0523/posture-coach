@@ -453,3 +453,16 @@ body.in-session .tabbar { display: none; }
 .nick-input span { color: #9aabba; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .w-ask { font-size: 26px !important; color: var(--ink) !important; background: none !important; -webkit-text-fill-color: currentColor; }
 .hello h1 { cursor: pointer; }
+
+/* ---------- 종료 확인 ---------- */
+.exit-wrap { position: fixed; inset: 0; z-index: 120; background: rgba(15,39,64,.45); display: flex; align-items: center; justify-content: center; padding: 0 24px; animation: exitIn .18s ease; }
+.exit-wrap[hidden] { display: none !important; }
+@keyframes exitIn { from { opacity: 0; } }
+.exit-dlg { width: 100%; max-width: 360px; background: #fff; border-radius: 24px; padding: 26px 20px 18px; text-align: center; }
+.exit-ico { font-size: 46px; line-height: 1; margin-bottom: 10px; }
+.exit-dlg h3 { margin: 0 0 8px; font-size: 21px; font-weight: 850; letter-spacing: -0.02em; }
+.exit-dlg p { margin: 0 0 18px; color: var(--muted); font-size: 15px; line-height: 1.5; word-break: keep-all; }
+.exit-stat { display: inline-flex; background: var(--surface); color: var(--sky-deep); font-weight: 700; font-size: 13.5px; border-radius: 999px; padding: 6px 12px; margin: -6px 0 16px; }
+.exit-btns { display: flex; gap: 8px; }
+.exit-btns .btn { flex: 1; }
+.exit-btns .btn:not(.primary) { background: var(--surface); color: var(--ink); }

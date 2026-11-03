@@ -139,14 +139,15 @@ function homeScreen() {
 
 // 인사: 닉네임(설정) → 구글 이름 → 없으면 인사만
 //  상황(오늘 운동 함 / 기록 끊김 / 연속 7일+)과 시간대에 따라 문구를 골라, 앱을 켤 때마다 바뀜
+// 한 줄에 다 보이게 짧게 (이름 포함 16자 안팎)
 const GREETS = {
-  done: ["오늘 운동 완료! 멋져요", "오늘도 해냈어요", "오늘 몫은 끝! 푹 쉬어요"],
-  ash: ["다시 불 붙여볼까요?", "오늘부터 다시 1일!", "잠깐 쉬었으니 다시 가볍게!"],
-  hot: ["벌써 연속 {n}일째!", "불꽃이 꺼지지 않게!", "연속 {n}일, 오늘도 이어가요"],
-  morning: ["좋은 아침이에요", "가볍게 몸 풀고 시작해요", "아침 운동, 하루가 달라져요"],
-  day: ["오늘도 가볍게!", "잠깐 스트레칭 어때요?", "오늘 운동, 10분이면 충분해요"],
-  evening: ["오늘 하루도 고생했어요", "하루 마무리 운동 한 판?", "저녁엔 가볍게 몸 풀어요"],
-  night: ["늦었어도 5분이면 충분해요", "자기 전 가볍게 스트레칭!", "오늘이 가기 전에 한 세트?"],
+  done: ["오늘 운동 완료!", "오늘도 해냈어요", "오늘도 수고했어요"],
+  ash: ["다시 불 붙여볼까요?", "오늘부터 다시 1일!", "다시 가볍게 시작!"],
+  hot: ["벌써 연속 {n}일째!", "불꽃이 꺼지지 않게!", "연속 {n}일 이어가요"],
+  morning: ["좋은 아침이에요", "몸 풀고 시작해요", "아침 운동 어때요?"],
+  day: ["오늘도 가볍게!", "잠깐 스트레칭 어때요?", "10분이면 충분해요"],
+  evening: ["오늘도 고생했어요", "마무리 운동 한 판?", "가볍게 몸 풀어요"],
+  night: ["5분이면 충분해요", "자기 전 스트레칭!", "자기 전 한 세트?"],
 };
 const greetSeed = Math.random();
 function greeting() {
@@ -709,6 +710,57 @@ account.onChange(() => { if (!$welcome.hidden && !document.getElementById("wNick
 account.init().catch((e) => console.warn(e)).finally(() => {
   if (forceWelcome || (account.available && !account.user && !store.sync.skipLogin)) showWelcome();
 });
+
+// ---------- 뒤로가기 · 종료 확인 ----------
+// 안드로이드 뒤로가기: 열린 창 닫기 → 이전 화면 → 홈 → (홈에서) 종료 확인 팝업. 종료 전에 계정 동기화
+let appPlugin = null;
+const todayStats = () => {
+  const today = dayKey(new Date());
+  const list = store.history.filter((h) => dayKey(h.ts) === today);
+  return { done: list.length > 0, min: Math.max(1, Math.round(list.reduce((s, h) => s + (h.durationSec || 0), 0) / 60)) };
+};
+function showExitDialog() {
+  let dlg = document.getElementById("exitDlg");
+  if (!dlg) { dlg = document.createElement("div"); dlg.id = "exitDlg"; dlg.className = "exit-wrap"; document.body.append(dlg); }
+  const t = todayStats(), n = streak();
+  dlg.innerHTML = t.done
+    ? `<div class="exit-dlg" role="dialog" aria-modal="true"><div class="exit-ico">👋</div><h3>오늘도 수고했어요!</h3><p>내일 또 만나요.</p>
+        <div class="exit-stat">🔥 연속 ${n}일 · 오늘 ${t.min}분</div>
+        <div class="exit-btns"><button class="btn" data-exit="stay">더 있을래요</button><button class="btn primary" data-exit="quit">종료</button></div></div>`
+    : `<div class="exit-dlg" role="dialog" aria-modal="true"><div class="exit-ico">🥺</div><h3>벌써 가시게요?</h3><p>오늘 운동을 아직 안 했어요.<br>정말 종료할까요?</p>
+        <div class="exit-btns"><button class="btn" data-exit="quit">종료</button><button class="btn primary" data-exit="go">운동하러 가기</button></div></div>`;
+  dlg.hidden = false;
+}
+const hideExitDialog = () => { const d = document.getElementById("exitDlg"); if (d) d.hidden = true; };
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-exit]");
+  if (!b && e.target.id === "exitDlg") return hideExitDialog();
+  if (!b) return;
+  if (b.dataset.exit === "stay") return hideExitDialog();
+  if (b.dataset.exit === "go") { hideExitDialog(); ui.tab = "home"; ui.stack = []; render(); window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+  if (b.dataset.exit === "quit") {
+    b.disabled = true; b.textContent = "저장 중…";
+    if (account.user) await Promise.race([account.sync(), new Promise((r) => setTimeout(r, 4000))]); // 끄기 전 동기화 (최대 4초)
+    appPlugin?.exitApp();
+  }
+});
+function onBack() {
+  const exitOpen = document.getElementById("exitDlg") && !document.getElementById("exitDlg").hidden;
+  if (exitOpen) return hideExitDialog();
+  if (document.body.classList.contains("in-session")) return document.getElementById("sClose")?.click(); // 운동 중: '끝낼까요?' 확인
+  if (!$sheet.hidden) { $sheet.hidden = true; return render(); }
+  if (!$welcome.hidden) return showExitDialog();
+  if (ui.stack.length) return pop();
+  if (ui.tab !== "home") { ui.tab = "home"; return render(); }
+  showExitDialog();
+}
+if (globalThis.Capacitor?.isNativePlatform?.() && globalThis.Capacitor?.isPluginAvailable?.("App")) {
+  import("./vendor/capacitor-core.js").then(({ registerPlugin }) => {
+    appPlugin = registerPlugin("App");
+    appPlugin.addListener("backButton", onBack);
+  }).catch((e) => console.warn(e));
+}
+if (new URLSearchParams(location.search).has("exit")) setTimeout(showExitDialog, 800); // 화면 확인용
 
 loadDefs().then(render).catch((e) => {
   console.error(e);
