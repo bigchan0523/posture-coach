@@ -864,10 +864,10 @@ function showExitDialog() {
   if (!dlg) { dlg = document.createElement("div"); dlg.id = "exitDlg"; dlg.className = "exit-wrap"; document.body.append(dlg); }
   const t = todayStats(), n = streak();
   dlg.innerHTML = t.done
-    ? `<div class="exit-dlg" role="dialog" aria-modal="true"><img class="exit-ico" src="img/logo.svg" alt=""><h3>오늘도 수고했어요!</h3><p>내일 또 만나요.</p>
-        <div class="exit-stat">연속 ${n}일 · 오늘 ${t.min}분</div>
+    ? `<div class="exit-dlg" role="dialog" aria-modal="true"><div class="exit-ico">👋</div><h3>오늘도 수고했어요!</h3><p>내일 또 만나요.</p>
+        <div class="exit-stat">🔥 연속 ${n}일 · 오늘 ${t.min}분</div>
         <div class="exit-btns"><button class="btn" data-exit="stay">더 있을래요</button><button class="btn primary" data-exit="quit">종료</button></div></div>`
-    : `<div class="exit-dlg" role="dialog" aria-modal="true"><img class="exit-ico" src="img/logo.svg" alt=""><h3>벌써 가시게요?</h3><p>오늘 운동을 아직 안 했어요.<br>정말 종료할까요?</p>
+    : `<div class="exit-dlg" role="dialog" aria-modal="true"><div class="exit-ico">🥺</div><h3>벌써 가시게요?</h3><p>오늘 운동을 아직 안 했어요.<br>정말 종료할까요?</p>
         <div class="exit-btns"><button class="btn" data-exit="quit">종료</button><button class="btn primary" data-exit="go">운동하러 가기</button></div></div>`;
   dlg.hidden = false;
 }
