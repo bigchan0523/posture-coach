@@ -509,7 +509,7 @@ function showTrackerDialog(useCamera) {
   document.querySelector(".toast")?.classList.remove("show");
   let dlg = document.getElementById("trkDlg");
   if (!dlg) { dlg = document.createElement("div"); dlg.id = "trkDlg"; dlg.className = "exit-wrap"; document.body.append(dlg); }
-  const h = "연결된 트래커가 없어요", p = "트래커가 잘 연결됐는지 확인해주세요";
+  const h = "⚠ 트래커를 찾을 수 없습니다", p = "트래커가 잘 연결됐는지 확인해주세요";
   dlg.innerHTML = `<div class="exit-dlg" role="dialog" aria-modal="true"><div class="trk-dlg-ico">${ICON.tracker}</div><h3>${h}</h3><p>${p}</p>
     <div class="exit-btns"><button class="btn" data-trkdlg="setup">트래커 설정</button><button class="btn primary" data-trkdlg="camera">카메라로 전환</button></div></div>`;
   dlg.hidden = false;
