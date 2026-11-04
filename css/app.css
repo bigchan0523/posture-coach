@@ -458,10 +458,48 @@ body.in-session .tabbar { display: none; }
 .exit-wrap[hidden] { display: none !important; }
 @keyframes exitIn { from { opacity: 0; } }
 .exit-dlg { width: 100%; max-width: 360px; background: #fff; border-radius: 24px; padding: 26px 20px 18px; text-align: center; }
-.exit-ico { font-size: 46px; line-height: 1; margin-bottom: 10px; }
+.exit-ico { width: 52px; height: 52px; display: block; margin: 0 auto 12px; }
 .exit-dlg h3 { margin: 0 0 8px; font-size: 21px; font-weight: 850; letter-spacing: -0.02em; }
 .exit-dlg p { margin: 0 0 18px; color: var(--muted); font-size: 15px; line-height: 1.5; word-break: keep-all; }
 .exit-stat { display: inline-flex; background: var(--surface); color: var(--sky-deep); font-weight: 700; font-size: 13.5px; border-radius: 999px; padding: 6px 12px; margin: -6px 0 16px; }
 .exit-btns { display: flex; gap: 8px; }
 .exit-btns .btn { flex: 1; }
 .exit-btns .btn:not(.primary) { background: var(--surface); color: var(--ink); }
+
+/* ---------- 초반 가이드 · 측정 방법 고르기 · 폰 세우는 법 ---------- */
+.welcome.guide { justify-content: flex-start; padding: calc(var(--safe-t) + 10px) 20px calc(var(--safe-b) + 20px); overflow-y: auto; }
+.g-head { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+.g-back, .g-x { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; margin-left: -8px; color: var(--ink); }
+.g-skip { color: var(--muted); font-weight: 700; font-size: 15px; padding: 8px 0 8px 12px; }
+.g-bar { height: 5px; background: var(--line); border-radius: 3px; margin: 8px 0 24px; overflow: hidden; }
+.g-bar i { display: block; height: 100%; background: var(--sky); border-radius: 3px; transition: width .3s ease; }
+.g-q { font-size: 25px; font-weight: 850; letter-spacing: -0.03em; line-height: 1.35; margin: 0; }
+.g-qs { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+.g-opts { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+.g-opt { display: flex; flex-direction: column; align-items: flex-start; text-align: left; width: 100%; border: 1.5px solid var(--line); border-radius: 16px; padding: 14px 16px; background: #fff; transition: border-color .15s, background .15s; }
+.g-opt b { font-size: 16.5px; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+.g-opt > span { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+.g-opt.on { border-color: var(--sky); background: #f2f9fe; }
+.g-tag { font-size: 11px; font-weight: 800; color: var(--good); background: #e3f6ec; border-radius: 6px; padding: 1px 6px; }
+.g-coach { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--sky-deep); font-size: 13.5px; font-weight: 700; animation: coachIn .25s ease; }
+.g-coach img { width: 24px; height: 24px; flex: none; background: #fff; border: 1px solid var(--sky-soft); border-radius: 50%; padding: 3px; }
+@keyframes coachIn { from { opacity: 0; transform: translateY(-4px); } }
+.g-foot { margin-top: auto; padding-top: 18px; }
+.g-note { text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+.g-sum { margin-top: 20px; border: 1.5px solid var(--sky); border-radius: 20px; padding: 18px 16px; background: #f5fbff; }
+.g-sum-h { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 850; letter-spacing: -0.02em; }
+.g-sum-h img { width: 34px; height: 34px; }
+.g-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 6px; margin-top: 16px; text-align: center; color: var(--muted); font-size: 12px; }
+.g-grid b { display: block; color: var(--ink); font-size: 15px; margin-top: 2px; }
+.g-list { list-style: none; padding: 0; margin: 14px 0 0; }
+.g-list li { display: flex; justify-content: space-between; padding: 10px 2px; border-bottom: 1px solid var(--line); font-size: 15px; }
+.g-ill-wrap { margin-top: 20px; border-radius: 20px; background: var(--surface); overflow: hidden; }
+.g-ill { width: 100%; height: auto; display: block; stroke-linecap: round; fill: none; }
+.g-steps { list-style: none; counter-reset: g; padding: 0; margin: 18px 0 0; display: flex; flex-direction: column; gap: 10px; }
+.g-steps li { counter-increment: g; display: flex; align-items: center; gap: 10px; font-size: 15px; }
+.g-steps li::before { content: counter(g); width: 24px; height: 24px; border-radius: 50%; background: var(--sky); color: #fff; font-size: 13px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: none; }
+.src-pick { padding: 16px 4px 4px; }
+.src-pick h2 { font-size: 22px; font-weight: 850; letter-spacing: -0.02em; }
+.src-pick .g-opts { margin-top: 16px; }
+.src-note { text-align: center; color: var(--muted); font-size: 13px; margin: 16px 0 10px; }
+.src-note b { color: var(--sky-deep); }

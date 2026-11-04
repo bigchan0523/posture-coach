@@ -7,6 +7,7 @@ import { weekdayBars, trendLine, monthCalendar, rings, dayFractions, RING_COLORS
 import { sfx } from "./sound.js";
 import { PICTOS } from "./pictos.js";
 import { account } from "./account.js";
+import { rig } from "./trackers.js";
 import { trackersScreen, mountTrackers, unmountTrackers, onTrackerAct, trackerSummary, setTrackerExercises } from "./trackers-ui.js";
 
 const defs = {};
@@ -28,6 +29,8 @@ const ICON = {
   gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   back: '<svg viewBox="0 0 24 24"><path d="M15 5 8 12l7 7"/></svg>',
   chev: '<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>',
+  close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  guide: '<svg viewBox="0 0 24 24"><path d="M5 4h10l4 4v12H5z"/><path d="M9 12h6M9 16h4"/></svg>',
   down: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>',
   check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   flame: '<svg viewBox="0 0 24 24"><path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.4 1.3-3.8 2.3-4.8.3 1.6 1.2 2.6 2.2 2.8C11 8.5 11 5.5 12 3z"/></svg>',
@@ -124,11 +127,6 @@ function homeScreen() {
       <button class="picker" data-act="pick-ex" data-for="test" aria-label="테스트할 운동 고르기">${mark(ui.testEx)}<span>${esc(exName(ui.testEx))}</span>${ICON.down}</button>
       <button class="btn primary" data-act="start-test">테스트</button>
     </div>
-  </section>
-
-  <section class="block">
-    <h3>측정 방법</h3>
-    ${(() => { const t = trackerSummary(); return `<button class="row trk-entry" data-act="open-trackers"><span class="mark plain">${ICON.tracker}</span><div class="row-main"><b>${t.src}</b><span class="muted">${esc(t.line)}</span></div>${ICON.chev}</button>`; })()}
   </section>
 
   <section class="block">
@@ -391,6 +389,7 @@ function openSettings() {
     ${toggle("voice", "음성 안내")}
     ${toggle("sounds", "효과음")}
     ${toggle("debug", "운동 중 각도 표시 (확인용)")}
+    <button class="row" data-act="guide-again"><span class="mark plain">${ICON.guide}</span><div class="row-main"><b>초반 가이드 다시 하기</b><span class="muted">운동 경험·집중 부위로 루틴 다시 고르기</span></div>${ICON.chev}</button>
     <button class="btn outline danger wide" data-act="reset-data">${ui.confirmReset ? "한 번 더 누르면 모든 기록이 지워져요" : "기록 모두 지우기"}</button>
     <p class="muted small">${account.user ? "기록은 이 폰과 구글 계정에 저장돼요. 지우면 계정에서도 지워져요." : "기록은 이 폰에만 저장돼요. 로그인하면 계정에도 저장돼요."}</p>`;
   $sheet.hidden = false;
@@ -448,12 +447,142 @@ function toast(text) {
 // ---------- 운동 시작 ----------
 function start(kind, title, items, file) {
   sfx.unlock();
+  if (kind !== "video") {
+    if (!store.settings.source && !store.sync.sourceAsked) return openSourcePicker(() => start(kind, title, items, file));
+    if ((store.settings.source || "camera") !== "trackers" && !store.sync.cameraTip) return showCameraTip(() => start(kind, title, items, file));
+  }
   runSession(defs, {
     kind, title, items, file,
     onClose: (saved) => { render(); if (saved) toast("기록을 저장했어요"); },
     onTrackerSetup: () => { ui.stack = [{ type: "trackers" }]; render(); },
   });
 }
+// ----- 처음 운동 시작할 때 한 번: 측정 방법 고르기 -----
+const SRC_OPTS = [
+  ["camera", "카메라", "폰 카메라로 관절을 인식해요. 18가지 운동 모두 가능", true],
+  ["trackers", "트래커", "몸에 붙인 트래커로만 측정해요. 폰은 아무 데나 둬도 돼요"],
+  ["both", "둘 다", "카메라와 트래커를 함께 써서 더 정확하게"],
+];
+const SRC_COACH = { camera: "폰만 있으면 바로 시작할 수 있어요!", trackers: "트래커를 연결하고 보정한 뒤에 시작해요", both: "트래커를 연결하고 보정하면 카메라와 함께 써요" };
+let srcNext = null, srcPick = "camera";
+function openSourcePicker(next) {
+  srcNext = next; srcPick = "camera";
+  const sh = $sheet.querySelector(".sheet");
+  sh.classList.remove("tall");
+  sh.dataset.kind = "source";
+  renderSourcePicker();
+  $sheet.hidden = false;
+}
+function renderSourcePicker() {
+  $sheet.querySelector(".sheet").innerHTML = `
+    <div class="src-pick">
+      <h2>어떻게 측정할까요?</h2><p class="muted">처음 한 번만 물어봐요</p>
+      <div class="g-opts">${SRC_OPTS.map(([v, t, d, rec]) => `<button class="g-opt${srcPick === v ? " on" : ""}" data-act="src-pick" data-val="${v}"><b>${t}${rec ? '<span class="g-tag">추천</span>' : ""}</b><span>${d}</span>${srcPick === v ? coach(SRC_COACH[v]) : ""}</button>`).join("")}</div>
+      <p class="src-note"><b>설정 › 측정 방법</b>에서 언제든 바꿀 수 있어요</p>
+      <button class="btn primary wide" data-act="src-ok">이걸로 시작</button>
+    </div>`;
+}
+function confirmSource() {
+  store.setSetting("source", srcPick);
+  store.setSync({ sourceAsked: true });
+  $sheet.hidden = true;
+  const next = srcNext; srcNext = null;
+  if (srcPick === "camera") return next?.();
+  // 트래커: 연결·보정이 끝나 있으면 바로, 아니면 트래커 화면으로
+  rig.start();
+  if (rig.ready) return next?.();
+  ui.tab = "home"; ui.stack = [{ type: "trackers" }]; render();
+  toast("트래커를 연결하고 보정한 뒤 운동을 시작해주세요");
+}
+const coach = (text) => `<span class="g-coach"><img src="img/logo.svg" alt="">${esc(text)}</span>`;
+
+// ----- 처음 카메라 운동 전에 한 번: 폰 세우는 법 -----
+let tipNext = null;
+const PHONE_SVG = `<svg class="g-ill" viewBox="0 0 300 220" aria-hidden="true">
+  <rect x="0" y="186" width="300" height="34" fill="#dbe9f5" stroke="none"/>
+  <rect x="40" y="104" width="26" height="46" rx="5" fill="#0f2740" stroke="none"/><rect x="43" y="108" width="20" height="36" rx="2" fill="#1e9be8" stroke="none"/><rect x="49" y="150" width="8" height="36" fill="#8aa3b8" stroke="none"/>
+  <path d="M66 126 L214 44 M66 126 L214 196" stroke="#1e9be8" stroke-width="2" stroke-dasharray="5 5"/>
+  <circle cx="228" cy="62" r="12" fill="#0f2740" stroke="none"/>
+  <path d="M228 76 L228 124 M228 124 L222 156 L226 184 M228 124 L236 156 L232 184 M228 88 L220 116 M228 88 L238 114" stroke="#0f2740" stroke-width="7"/>
+  <path d="M74 208 L218 208" stroke="#1572b8" stroke-width="2"/><path d="M74 203 L74 213 M218 203 L218 213" stroke="#1572b8" stroke-width="2"/>
+  <text x="146" y="202" text-anchor="middle" font-size="13" font-weight="700" fill="#1572b8" stroke="none">2~3m</text></svg>`;
+function showCameraTip(next) {
+  tipNext = next;
+  $welcome.className = "welcome guide";
+  $welcome.innerHTML = `
+    <div class="g-head"><button class="g-x" data-act="tip-ok" aria-label="닫기">${ICON.close}</button></div>
+    <h1 class="g-q">운동 전에<br>폰을 이렇게 세워주세요</h1><p class="g-qs">첫 카메라 운동 때 한 번만 보여줘요</p>
+    <div class="g-ill-wrap">${PHONE_SVG}</div>
+    <ol class="g-steps"><li>바닥이나 의자에 세로로 세워요 (허리 높이)</li><li>머리부터 발끝까지 화면에 다 나오게</li><li>운동마다 옆·정면 중 어느 쪽으로 설지 알려드려요</li></ol>
+    <div class="g-foot"><button class="btn primary wide" data-act="tip-ok">알겠어요</button></div>`;
+  $welcome.hidden = false;
+}
+
+// ----- 처음 실행: 초반 가이드 (운동 경험 → 집중 부위 → 하루 목표 → 맞춤 루틴) -----
+const GUIDE = [
+  { key: "level", q: "운동은 얼마나<br>해보셨나요?", sub: "난이도를 맞추는 데만 써요", opts: [
+    ["easy", "처음이에요", "운동 자세도 잘 몰라요", "걱정 마세요, 자세는 제가 하나씩 알려드릴게요"],
+    ["mid", "가끔 해요", "기본 동작은 알아요", "딱 좋아요! 자세는 제가 옆에서 봐드릴게요"],
+    ["hard", "꾸준히 해요", "주 3회 이상 운동해요", "좋아요, 조금 더 빡세게 짜드릴게요"],
+  ] },
+  { key: "routine", q: "어디를 집중해서<br>운동하고 싶나요?", sub: "오늘의 루틴을 골라드릴게요", opts: [
+    ["fullbody", "전신 골고루", "스쿼트·푸시업·플랭크", "처음이라면 전신부터가 제일 좋아요"],
+    ["legs", "하체", "허벅지와 엉덩이", "하체는 큰 근육이라 운동 효과가 커요"],
+    ["core", "코어", "복부와 허리 안정", "코어가 잡히면 다른 운동 자세도 좋아져요"],
+    ["cardio", "체력 · 유산소", "짧고 숨차게", "짧게 끝내도 땀이 쭉 나요"],
+    ["dumbbell", "상체", "덤벨 한 쌍이 있어야 해요", "덤벨이 없다면 전신 루틴의 푸시업부터!"],
+  ] },
+  { key: "min", q: "하루에 얼마나<br>운동할까요?", sub: "홈 달력의 목표 링이 이만큼 차요", opts: [
+    [10, "10분", "가볍게 습관부터", "10분이라도 매일 하는 게 제일 중요해요"],
+    [20, "20분", "무리 없이 꾸준히", "하루 20분이면 일주일에 2시간이 넘어요!", true],
+    [30, "30분", "제대로 땀 흘리기", "30분이면 루틴 두 번도 거뜬해요"],
+    [45, "45분 이상", "운동이 일상이에요", "멋져요, 쉬는 시간도 꼭 챙겨요"],
+  ] },
+];
+const guide = { step: 0, level: null, routine: null, min: null };
+const needGuide = () => !store.sync.guided && !store.history.length;
+function showGuide() {
+  Object.assign(guide, { step: 0, level: null, routine: null, min: null });
+  $welcome.className = "welcome guide";
+  renderGuide();
+  $welcome.hidden = false;
+}
+function renderGuide() {
+  const n = GUIDE.length;
+  const head = `<div class="g-head">${guide.step ? `<button class="g-back" data-act="g-back" aria-label="이전">${ICON.back}</button>` : "<span></span>"}
+    ${guide.step < n ? `<button class="g-skip" data-act="g-skip">건너뛰기</button>` : ""}</div>
+    <div class="g-bar"><i style="width:${((guide.step + 1) / (n + 1)) * 100}%"></i></div>`;
+  if (guide.step < n) {
+    const g = GUIDE[guide.step], cur = guide[g.key];
+    $welcome.innerHTML = `${head}<h1 class="g-q">${g.q}</h1><p class="g-qs">${g.sub}</p>
+      <div class="g-opts scroll">${g.opts.map(([v, t, d, c, rec]) => `<button class="g-opt${cur === v ? " on" : ""}" data-act="g-pick" data-val="${v}"><b>${t}${rec ? '<span class="g-tag">추천</span>' : ""}</b><span>${d}</span>${cur === v ? coach(c) : ""}</button>`).join("")}</div>
+      <div class="g-foot"><button class="btn primary wide" data-act="g-next" ${cur == null ? "disabled" : ""}>다음</button></div>`;
+    return;
+  }
+  // 마지막: 고른 내용 요약 + 맞춤 루틴
+  const base = routineById(guide.routine) || PRESETS[0];
+  const r = scaled(base, guide.level || "easy");
+  const lv = LEVELS.find((l) => l.id === r.level);
+  const lvText = GUIDE[0].opts.find((o) => o[0] === guide.level)?.[1] || "-";
+  const area = GUIDE[1].opts.find((o) => o[0] === guide.routine)?.[1] || "-";
+  $welcome.innerHTML = `${head}<h1 class="g-q">${esc(greetName())}님에게 맞는<br>루틴이 준비됐어요</h1>
+    <div class="g-sum"><div class="g-sum-h"><img src="img/logo.svg" alt="">${esc(base.name)} · ${lv?.name || ""}</div>
+      <div class="g-grid"><div>운동 경험<b>${lvText}</b></div><div>집중 부위<b>${area}</b></div><div>하루 목표<b>${guide.min}분</b></div>
+        <div>운동 수<b>${r.items.length}가지</b></div><div>세트<b>${totalSets(r)}세트</b></div><div>예상 시간<b>약 ${estimateMinutes(r, store.settings.restSec)}분</b></div></div></div>
+    <ol class="g-list">${r.items.map((it) => `<li><span>${esc(exName(it.ex))}</span><span>${it.sets}×${amount(it)}</span></li>`).join("")}</ol>
+    <div class="g-foot"><p class="g-note">루틴과 난이도는 홈에서 언제든 바꿀 수 있어요</p><button class="btn primary wide" data-act="g-done">좋아요, 시작할게요</button></div>`;
+}
+function endGuide(apply) {
+  if (apply) {
+    store.setToday(guide.routine, guide.level);
+    store.setSetting("goalMin", guide.min);
+  }
+  store.setSync({ guided: true });
+  hideWelcome();
+  ui.tab = "home"; ui.stack = []; render();
+  if (apply) toast("오늘의 루틴으로 정했어요");
+}
+
 const testItem = (ex) => (isHold(ex) ? { ex, sets: 1, sec: 30 } : { ex, sets: 1, reps: 10 });
 
 // ---------- 이벤트 ----------
@@ -610,6 +739,9 @@ $sheet.addEventListener("click", (e) => {
   const b = e.target.closest("[data-act],[data-set]");
   if (!b) return;
   if (b.dataset.act === "close-sheet") { $sheet.hidden = true; return render(); }
+  if (b.dataset.act === "src-pick") { srcPick = b.dataset.val; return renderSourcePicker(); }
+  if (b.dataset.act === "src-ok") return confirmSource();
+  if (b.dataset.act === "guide-again") { $sheet.hidden = true; return showGuide(); }
   if (b.dataset.act === "edit-nick") return openNickname();
   if (b.dataset.act === "save-nick") return saveNickname();
   if (b.dataset.act === "acct-in") { account.signIn().then(() => { if (account.user) toast("로그인했어요"); }); return; }
@@ -661,6 +793,7 @@ account.onChange(() => {
 // 시작 화면이 끝나기 전에 로그인 여부를 확인해서, 필요하면 '구글로 시작하기' 화면을 깔아둠
 const $welcome = document.getElementById("welcome");
 const forceWelcome = new URLSearchParams(location.search).has("welcome");
+const forceGuide = new URLSearchParams(location.search).has("guide");
 const G_LOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.8c4.3-4 6.9-9.9 6.9-17.2z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.8c-2.1 1.4-4.8 2.3-8.5 2.3-6.2 0-11.5-4.1-13.4-9.9l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>';
 function renderWelcome() {
   const busy = account.status === "signing" || account.status === "syncing";
@@ -682,31 +815,40 @@ function renderNickAsk() {
   const inp = document.getElementById("wNick");
   inp.addEventListener("input", () => { document.getElementById("wCnt").textContent = `${inp.value.length}/${NICK_MAX}`; });
 }
-function showWelcome() { renderWelcome(); $welcome.hidden = false; }
+function showWelcome() { $welcome.className = "welcome"; renderWelcome(); $welcome.hidden = false; }
+/** 로그인·닉네임이 끝나면: 처음이면 초반 가이드, 아니면 홈 */
+function afterWelcome() { render(); if (needGuide()) showGuide(); else hideWelcome(); }
 function hideWelcome() { $welcome.classList.add("hide"); setTimeout(() => { $welcome.hidden = true; $welcome.classList.remove("hide"); }, 300); }
 $welcome.addEventListener("click", async (e) => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
-  if (b.dataset.act === "w-skip") { store.setSync({ skipLogin: true }); hideWelcome(); return; }
+  if (b.dataset.act === "w-skip") { store.setSync({ skipLogin: true }); return afterWelcome(); }
+  if (b.dataset.act === "tip-ok") { store.setSync({ cameraTip: true }); hideWelcome(); const next = tipNext; tipNext = null; return next?.(); }
+  if (b.dataset.act === "g-pick") { const g = GUIDE[guide.step]; const v = b.dataset.val; guide[g.key] = g.key === "min" ? Number(v) : v; return renderGuide(); }
+  if (b.dataset.act === "g-next") { if (guide[GUIDE[guide.step].key] != null) { guide.step++; renderGuide(); } return; }
+  if (b.dataset.act === "g-back") { guide.step = Math.max(0, guide.step - 1); return renderGuide(); }
+  if (b.dataset.act === "g-skip") return endGuide(false);
+  if (b.dataset.act === "g-done") return endGuide(true);
   if (b.dataset.act === "w-google") {
     if (!account.available) { account.error = "이 버전에는 구글 로그인이 없어요 (앱에서만 돼요)"; renderWelcome(); return; }
     await account.signIn();
     if (!account.user) return renderWelcome();
     // 처음 로그인(계정에도 닉네임이 없음)이면 한 번만 닉네임 묻기
     if (!store.settings.nickname && !store.sync.askedNick) return renderNickAsk();
-    hideWelcome(); render(); toast(`${greetName()}님, 환영해요`);
+    toast(`${greetName()}님, 환영해요`); afterWelcome();
   }
   if (b.dataset.act === "w-nick" || b.dataset.act === "w-nick-skip") {
     const v = b.dataset.act === "w-nick" ? document.getElementById("wNick").value.trim().slice(0, NICK_MAX) : "";
     if (v) store.setSetting("nickname", v);
     store.setSync({ askedNick: true });
-    hideWelcome(); render(); toast(`${greetName()}님, 환영해요`);
+    toast(`${greetName()}님, 환영해요`); afterWelcome();
   }
 });
-account.onChange(() => { if (!$welcome.hidden && !document.getElementById("wNick")) renderWelcome(); });
+account.onChange(() => { if (!$welcome.hidden && !$welcome.classList.contains("guide") && !document.getElementById("wNick")) renderWelcome(); });
 
 account.init().catch((e) => console.warn(e)).finally(() => {
   if (forceWelcome || (account.available && !account.user && !store.sync.skipLogin)) showWelcome();
+  else if (forceGuide || needGuide()) showGuide();
 });
 
 // ---------- 뒤로가기 · 종료 확인 ----------
@@ -722,10 +864,10 @@ function showExitDialog() {
   if (!dlg) { dlg = document.createElement("div"); dlg.id = "exitDlg"; dlg.className = "exit-wrap"; document.body.append(dlg); }
   const t = todayStats(), n = streak();
   dlg.innerHTML = t.done
-    ? `<div class="exit-dlg" role="dialog" aria-modal="true"><div class="exit-ico">👋</div><h3>오늘도 수고했어요!</h3><p>내일 또 만나요.</p>
-        <div class="exit-stat">🔥 연속 ${n}일 · 오늘 ${t.min}분</div>
+    ? `<div class="exit-dlg" role="dialog" aria-modal="true"><img class="exit-ico" src="img/logo.svg" alt=""><h3>오늘도 수고했어요!</h3><p>내일 또 만나요.</p>
+        <div class="exit-stat">연속 ${n}일 · 오늘 ${t.min}분</div>
         <div class="exit-btns"><button class="btn" data-exit="stay">더 있을래요</button><button class="btn primary" data-exit="quit">종료</button></div></div>`
-    : `<div class="exit-dlg" role="dialog" aria-modal="true"><div class="exit-ico">🥺</div><h3>벌써 가시게요?</h3><p>오늘 운동을 아직 안 했어요.<br>정말 종료할까요?</p>
+    : `<div class="exit-dlg" role="dialog" aria-modal="true"><img class="exit-ico" src="img/logo.svg" alt=""><h3>벌써 가시게요?</h3><p>오늘 운동을 아직 안 했어요.<br>정말 종료할까요?</p>
         <div class="exit-btns"><button class="btn" data-exit="quit">종료</button><button class="btn primary" data-exit="go">운동하러 가기</button></div></div>`;
   dlg.hidden = false;
 }
@@ -747,6 +889,11 @@ function onBack() {
   if (exitOpen) return hideExitDialog();
   if (document.body.classList.contains("in-session")) return document.getElementById("sClose")?.click(); // 운동 중: '끝낼까요?' 확인
   if (!$sheet.hidden) { $sheet.hidden = true; return render(); }
+  if (!$welcome.hidden && $welcome.classList.contains("guide")) {
+    if (tipNext) { tipNext = null; return hideWelcome(); }          // 폰 세우는 법: 닫기 (운동은 시작 안 함)
+    if (guide.step > 0) { guide.step--; return renderGuide(); }      // 가이드: 이전 질문
+    return showExitDialog();
+  }
   if (!$welcome.hidden) return showExitDialog();
   if (ui.stack.length) return pop();
   if (ui.tab !== "home") { ui.tab = "home"; return render(); }
