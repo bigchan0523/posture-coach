@@ -445,14 +445,25 @@ function toast(text) {
 }
 
 // ---------- 운동 시작 ----------
-function start(kind, title, items, file) {
+async function start(kind, title, items, file, { source = null, checked = false } = {}) {
   sfx.unlock();
+  const again = (o = {}) => start(kind, title, items, file, { source, checked, ...o });
   if (kind !== "video") {
-    if (!store.settings.source && !store.sync.sourceAsked) return openSourcePicker(() => start(kind, title, items, file));
-    if ((store.settings.source || "camera") !== "trackers" && !store.sync.cameraTip) return showCameraTip(() => start(kind, title, items, file));
+    if (!store.settings.source && !store.sync.sourceAsked) return openSourcePicker(() => again());
+    const src = source || store.settings.source || "camera";
+    // 트래커 모드인데 트래커가 준비 안 됐으면: 트래커 설정 / 카메라로 전환 고르기
+    if (src !== "camera" && !checked) {
+      if (!rig.ready) {
+        toast("트래커 확인 중…");
+        await rig.start();
+        for (let i = 0; i < 15 && !rig.ready; i++) await new Promise((ok) => setTimeout(ok, 100));
+      }
+      if (!rig.ready) return showTrackerDialog(() => again({ source: "camera", checked: true }));
+    }
+    if (src !== "trackers" && !store.sync.cameraTip) return showCameraTip(() => again({ checked: true }));
   }
   runSession(defs, {
-    kind, title, items, file,
+    kind, title, items, file, source,
     onClose: (saved) => { render(); if (saved) toast("기록을 저장했어요"); },
     onTrackerSetup: () => { ui.stack = [{ type: "trackers" }]; render(); },
   });
@@ -487,14 +498,31 @@ function confirmSource() {
   store.setSync({ sourceAsked: true });
   $sheet.hidden = true;
   const next = srcNext; srcNext = null;
-  if (srcPick === "camera") return next?.();
-  // 트래커: 연결·보정이 끝나 있으면 바로, 아니면 트래커 화면으로
-  rig.start();
-  if (rig.ready) return next?.();
-  ui.tab = "home"; ui.stack = [{ type: "trackers" }]; render();
-  toast("트래커를 연결하고 보정한 뒤 운동을 시작해주세요");
+  next?.(); // 트래커가 준비 안 됐으면 start()에서 트래커 설정 / 카메라로 전환을 물어봄
 }
 const coach = (text) => `<span class="g-coach"><img src="img/logo.svg" alt="">${esc(text)}</span>`;
+
+// ----- 트래커 모드인데 트래커가 준비 안 됐을 때 -----
+let trkDlgCamera = null;
+function showTrackerDialog(useCamera) {
+  trkDlgCamera = useCamera;
+  document.querySelector(".toast")?.classList.remove("show");
+  let dlg = document.getElementById("trkDlg");
+  if (!dlg) { dlg = document.createElement("div"); dlg.id = "trkDlg"; dlg.className = "exit-wrap"; document.body.append(dlg); }
+  const h = "연결된 트래커가 없어요", p = "트래커가 잘 연결됐는지 확인해주세요";
+  dlg.innerHTML = `<div class="exit-dlg" role="dialog" aria-modal="true"><div class="trk-dlg-ico">${ICON.tracker}</div><h3>${h}</h3><p>${p}</p>
+    <div class="exit-btns"><button class="btn" data-trkdlg="setup">트래커 설정</button><button class="btn primary" data-trkdlg="camera">카메라로 전환</button></div></div>`;
+  dlg.hidden = false;
+}
+const hideTrackerDialog = () => { const d = document.getElementById("trkDlg"); if (d) d.hidden = true; trkDlgCamera = null; };
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-trkdlg]");
+  if (!b) { if (e.target.id === "trkDlg") hideTrackerDialog(); return; }
+  const cam = trkDlgCamera;
+  hideTrackerDialog();
+  if (b.dataset.trkdlg === "camera") return cam?.();
+  $sheet.hidden = true; ui.tab = "home"; ui.stack = [{ type: "trackers" }]; render();
+});
 
 // ----- 처음 카메라 운동 전에 한 번: 폰 세우는 법 -----
 let tipNext = null;
@@ -887,6 +915,8 @@ document.addEventListener("click", async (e) => {
 function onBack() {
   const exitOpen = document.getElementById("exitDlg") && !document.getElementById("exitDlg").hidden;
   if (exitOpen) return hideExitDialog();
+  const trkOpen = document.getElementById("trkDlg") && !document.getElementById("trkDlg").hidden;
+  if (trkOpen) return hideTrackerDialog();
   if (document.body.classList.contains("in-session")) return document.getElementById("sClose")?.click(); // 운동 중: '끝낼까요?' 확인
   if (!$sheet.hidden) { $sheet.hidden = true; return render(); }
   if (!$welcome.hidden && $welcome.classList.contains("guide")) {

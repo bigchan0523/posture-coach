@@ -503,3 +503,5 @@ body.in-session .tabbar { display: none; }
 .src-pick .g-opts { margin-top: 16px; }
 .src-note { text-align: center; color: var(--muted); font-size: 13px; margin: 16px 0 10px; }
 .src-note b { color: var(--sky-deep); }
+.trk-dlg-ico { width: 56px; height: 56px; border-radius: 50%; background: var(--surface); color: var(--sky-deep); display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
+.trk-dlg-ico svg { width: 28px; height: 28px; }

@@ -54,7 +54,7 @@ class Session {
     this.results = this.items.map((it) => ({ ex: it.ex, name: defs[it.ex].display_name, sets: [] }));
     this.t0 = Date.now();
     // 측정 방법: camera | trackers | both (영상 분석은 항상 카메라 방식)
-    this.source = opts.kind === "video" ? "camera" : store.settings.source || "camera";
+    this.source = opts.kind === "video" ? "camera" : opts.source || store.settings.source || "camera";
     this.el = {
       root: $("session"), video: $("sVideo"), canvas: $("sCanvas"), title: $("sTitle"), sub: $("sSub"),
       notice: $("sNotice"), ring: $("sRing"), ringBar: $("sRingBar"), count: $("sCount"), target: $("sTarget"),
