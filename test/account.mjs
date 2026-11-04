@@ -47,8 +47,12 @@ export async function runAccountTests(check) {
   await new Promise((r) => setTimeout(r, 20));
   check("기록 삭제도 반영", !fb.docs.has("users/u1/sessions/s2"));
 
-  // 앱을 지우고 다시 설치한 상황: 로그아웃 → 이 폰 기록 전부 사라짐 → 다시 로그인
+  // 로그아웃: 계정 기록은 이 폰에서 지우고, 기기 전용 설정(트래커 지정)은 남김
+  store.setSetting("trackerAssign", { chest: "AA" });
   await account.signOut();
+  check("로그아웃하면 이 폰 기록 지워짐 (계정엔 남음)", store.history.length === 0 && store.settings.restSec === 30 && fb.docs.has("users/u1/sessions/s3"));
+  check("로그아웃해도 트래커 지정은 남음", store.settings.trackerAssign?.chest === "AA");
+  check("로그아웃하면 다음엔 로그인 화면", store.sync.skipLogin === false && !store.sync.uid);
   store.resetAll();
   check("다시 설치 후 기록 없음", store.history.length === 0 && fb.docs.has("users/u1/sessions/s1"));
   await account.signIn();

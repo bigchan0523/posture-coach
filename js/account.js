@@ -62,9 +62,12 @@ class Account {
   }
 
   async signOut() {
+    // 나가기 전에 아직 안 올라간 기록을 올리고(최대 4초), 이 폰의 계정 기록은 지움 → 다른 계정으로 로그인해도 안 섞임
+    if (this.user) { try { await Promise.race([this.sync(), new Promise((ok) => setTimeout(ok, 4000))]); } catch (e) { console.warn(e); } }
     try { await this.auth?.signOut(); } catch (e) { console.warn(e); }
     this.user = null;
-    store.setSync({ uid: null, at: null, skipLogin: false }); // 로그아웃하면 다음 실행 때 다시 로그인 화면
+    store.clearLocal([...LOCAL_ONLY, "source"]);
+    store.setSync({ uid: null, at: null, skipLogin: false }); // 로그아웃하면 다시 로그인 화면
     this.status = "idle";
     this.changed();
   }

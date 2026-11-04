@@ -54,6 +54,13 @@ export const store = {
   get history() { return state.history; },
   addSession(s) { state.history.push(s); save(); emit("session-add", s); },
   deleteSession(id) { state.history = state.history.filter((h) => h.id !== id); save(); emit("session-delete", id); },
+  /** 로그아웃: 이 폰에 남은 계정 기록·설정을 지움 (계정에는 그대로). 기기 전용 설정(트래커·카메라 방향 등)과 안내 표시 여부는 유지 */
+  clearLocal(keep = []) {
+    const settings = { ...DEFAULT.settings };
+    for (const k of keep) if (state.settings[k] !== undefined) settings[k] = state.settings[k];
+    state = { ...structuredClone(DEFAULT), settings, sync: { ...(state.sync || {}), uid: null, at: null } };
+    save();
+  },
   resetAll() { const ids = state.history.map((h) => h.id); state = structuredClone(DEFAULT); save(); emit("reset", ids); },
 
   /** 계정에서 받아온 기록 합치기 (같은 id는 그대로, 없는 것만 추가) */

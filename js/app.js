@@ -773,7 +773,12 @@ $sheet.addEventListener("click", (e) => {
   if (b.dataset.act === "edit-nick") return openNickname();
   if (b.dataset.act === "save-nick") return saveNickname();
   if (b.dataset.act === "acct-in") { account.signIn().then(() => { if (account.user) toast("로그인했어요"); }); return; }
-  if (b.dataset.act === "acct-out") { account.signOut().then(() => toast("로그아웃했어요")); return; }
+  if (b.dataset.act === "acct-out") {
+    b.disabled = true; b.textContent = "로그아웃 중…";
+    // 로그아웃 → 처음 화면(구글로 시작하기)으로
+    account.signOut().then(() => { $sheet.hidden = true; ui.tab = "home"; ui.stack = []; render(); showWelcome(); });
+    return;
+  }
   if (b.dataset.act === "acct-sync") { account.sync().then((r) => { if (r) toast(r.added ? `기록 ${r.added}개를 가져왔어요` : "동기화했어요"); }); return; }
   if (b.dataset.act === "open-trackers") { $sheet.hidden = true; ui.stack.push({ type: "trackers" }); return render(); }
   if (b.dataset.act === "reset-data") {
