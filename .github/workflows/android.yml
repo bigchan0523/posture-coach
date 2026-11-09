@@ -114,8 +114,8 @@ jobs:
             cat android/variables.gradle
           fi
           cat "$RES"/mipmap-anydpi-v26/ic_launcher.xml
-          # 플레이 스토어 조건: 새 앱은 Android 16(API 36) 대상 → SDK 36 + 그걸 지원하는 빌드 도구(AGP 8.10)
-          sed -i 's/compileSdkVersion = [0-9]*/compileSdkVersion = 36/; s/targetSdkVersion = [0-9]*/targetSdkVersion = 36/' android/variables.gradle
+          # 플레이 스토어 조건: 새 앱은 Android 16(API 36) 대상, Play 자동 보호는 최소 Android 7(API 24) → SDK 36 + 그걸 지원하는 빌드 도구(AGP 8.10)
+          sed -i 's/minSdkVersion = [0-9]*/minSdkVersion = 24/; s/compileSdkVersion = [0-9]*/compileSdkVersion = 36/; s/targetSdkVersion = [0-9]*/targetSdkVersion = 36/' android/variables.gradle
           sed -i "s#com.android.tools.build:gradle:[0-9.]*#com.android.tools.build:gradle:8.10.1#" android/build.gradle
           sed -i "s#gradle-[0-9.]*-all.zip#gradle-8.11.1-all.zip#" android/gradle/wrapper/gradle-wrapper.properties
           grep -n "Sdk" android/variables.gradle; grep -n "tools.build" android/build.gradle; grep distributionUrl android/gradle/wrapper/gradle-wrapper.properties
