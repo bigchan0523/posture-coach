@@ -62,8 +62,14 @@ jobs:
           cat > "$MAIN" <<JAVA
           $PKG
 
+          import android.graphics.Color;
           import android.os.Bundle;
+          import android.view.View;
           import android.view.WindowManager;
+          import androidx.core.graphics.Insets;
+          import androidx.core.view.ViewCompat;
+          import androidx.core.view.WindowCompat;
+          import androidx.core.view.WindowInsetsCompat;
           import com.getcapacitor.BridgeActivity;
 
           public class MainActivity extends BridgeActivity {
@@ -72,6 +78,18 @@ jobs:
                   registerPlugin(SlimeVRPlugin.class);
                   super.onCreate(savedInstanceState);
                   getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                  // 안드로이드 15+는 앱을 화면 끝까지 그림 → 상태바·아래 버튼·키보드 만큼 여백을 줘서 가려지지 않게
+                  WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+                  getWindow().getDecorView().setBackgroundColor(Color.WHITE);
+                  WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightStatusBars(true);
+                  WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightNavigationBars(true);
+                  View content = findViewById(android.R.id.content);
+                  ViewCompat.setOnApplyWindowInsetsListener(content, (v, insets) -> {
+                      Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+                      Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+                      v.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, ime.bottom));
+                      return WindowInsetsCompat.CONSUMED;
+                  });
               }
           }
           JAVA
@@ -96,6 +114,17 @@ jobs:
             cat android/variables.gradle
           fi
           cat "$RES"/mipmap-anydpi-v26/ic_launcher.xml
+          # 플레이 스토어 조건: 새 앱은 Android 16(API 36) 대상 → SDK 36 + 그걸 지원하는 빌드 도구(AGP 8.10)
+          sed -i 's/compileSdkVersion = [0-9]*/compileSdkVersion = 36/; s/targetSdkVersion = [0-9]*/targetSdkVersion = 36/' android/variables.gradle
+          sed -i "s#com.android.tools.build:gradle:[0-9.]*#com.android.tools.build:gradle:8.10.1#" android/build.gradle
+          sed -i "s#gradle-[0-9.]*-all.zip#gradle-8.11.1-all.zip#" android/gradle/wrapper/gradle-wrapper.properties
+          grep -n "Sdk" android/variables.gradle; grep -n "tools.build" android/build.gradle; grep distributionUrl android/gradle/wrapper/gradle-wrapper.properties
+          # 앱 버전: 이름은 VERSION 파일, 번호는 빌드 번호 (스토어에 올릴 때마다 커져야 함)
+          VER=$(cat VERSION)
+          sed -i "s/versionCode [0-9]*/versionCode ${{ github.run_number }}/; s/versionName \"[^\"]*\"/versionName \"$VER\"/" android/app/build.gradle
+          grep -n "versionCode\|versionName" android/app/build.gradle
+          # 안드로이드 16의 '뒤로 가기 미리보기' 대신 지금처럼 앱이 뒤로 가기를 직접 처리
+          sed -i 's#<application#<application\n        android:enableOnBackInvokedCallback="false"#' "$MANIFEST"
           npx cap sync android
 
       - name: APK 빌드
@@ -120,17 +149,48 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
+      # 플레이 스토어용 AAB: 업로드 키로 서명. 키 파일·비밀번호는 저장소가 아니라 GitHub Secrets에만 있음
+      #   UPLOAD_KEYSTORE_B64 (키 파일을 base64로 바꾼 글자), UPLOAD_KEYSTORE_PASSWORD
+      - name: 플레이 스토어용 AAB 빌드 (업로드 키가 Secrets에 있을 때만)
+        working-directory: android
+        env:
+          UPLOAD_KEYSTORE_B64: ${{ secrets.UPLOAD_KEYSTORE_B64 }}
+          UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.UPLOAD_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$UPLOAD_KEYSTORE_B64" ] || [ -z "$UPLOAD_KEYSTORE_PASSWORD" ]; then echo "업로드 키 Secrets 없음 → AAB 건너뜀"; exit 0; fi
+          echo "$UPLOAD_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          cat >> app/build.gradle <<'GRADLE'
+
+          android {
+              signingConfigs {
+                  upload {
+                      storeFile file(System.getenv("RUNNER_TEMP") + "/upload.jks")
+                      storePassword System.getenv("UPLOAD_KEYSTORE_PASSWORD")
+                      keyAlias "jakojako-upload"
+                      keyPassword System.getenv("UPLOAD_KEYSTORE_PASSWORD")
+                  }
+              }
+              buildTypes { release { signingConfig signingConfigs.upload } }
+          }
+          GRADLE
+          ./gradlew bundleRelease --no-daemon
+          ls -la app/build/outputs/bundle/release/
+
       - uses: actions/upload-artifact@v4
         with:
           name: posture-coach-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
 
-      # 폰에서 바로 받을 수 있게 Releases의 'latest'에 APK를 올린다 (매 빌드마다 교체)
-      - name: 릴리스에 APK 올리기
+      # 폰에서 바로 받을 수 있게 Releases의 'latest'에 APK(+ 있으면 스토어용 AAB)를 올린다 (매 빌드마다 교체)
+      - name: 릴리스에 APK·AAB 올리기
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          VER=$(cat VERSION)
           cp android/app/build/outputs/apk/debug/app-debug.apk posture-coach.apk
+          FILES="posture-coach.apk"
+          AAB=android/app/build/outputs/bundle/release/app-release.aab
+          if [ -f "$AAB" ]; then cp "$AAB" "jakojako-$VER.aab"; FILES="$FILES jakojako-$VER.aab"; fi
           gh release delete latest -y --cleanup-tag || true
-          gh release create latest posture-coach.apk --title "최신 APK" --notes "커밋 ${GITHUB_SHA::7} 빌드. 폰에서 posture-coach.apk를 받아 설치하세요." --latest
+          gh release create latest $FILES --title "최신 APK ($VER, 빌드 ${{ github.run_number }})" --notes "커밋 ${GITHUB_SHA::7} 빌드. 폰에서 posture-coach.apk를 받아 설치하세요. jakojako-$VER.aab 는 플레이 스토어 업로드용." --latest
